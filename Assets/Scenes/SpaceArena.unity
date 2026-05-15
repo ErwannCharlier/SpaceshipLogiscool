@@ -769,6 +769,9 @@ MonoBehaviour:
   minPitch: -45
   maxPitch: 45
   invertMouseY: 0
+  rollSpeed: 120
+  maxRoll: 55
+  rollReturnSpeed: 90
   fireCooldown: 0.4
   shootPoint: {fileID: 0}
   laserPrefab: {fileID: 0}
@@ -2145,7 +2148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fab1a8d37561af34899f74b018cf98f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverUrl: ws://localhost:8765
+  serverUrl: ws://unity.erwann.xyz
   connectOnStart: 0
 --- !u!4 &2097458130
 Transform:
