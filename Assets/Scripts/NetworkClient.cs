@@ -10,7 +10,7 @@ using UnityEngine;
 public class NetworkClient : MonoBehaviour
 {
     [Header("Connection")]
-    public string serverUrl = "ws://localhost:8765";
+    public string serverUrl = "wss://unity.erwann.xyz";
     public bool connectOnStart = false;
 
     public string LocalPlayerId { get; private set; }
