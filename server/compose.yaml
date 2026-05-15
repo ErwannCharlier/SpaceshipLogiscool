@@ -1,0 +1,10 @@
+services:
+  flying-nugget-server:
+    build: .
+    container_name: flying-nugget-server
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8765
+    ports:
+      - "127.0.0.1:8765:8765"
