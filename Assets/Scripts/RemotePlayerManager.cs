@@ -58,69 +58,23 @@ public class RemotePlayerManager : MonoBehaviour
 
     private void HandleWorld(NetworkPlayerInfo[] players)
     {
-        if (players == null)
-        {
-            return;
-        }
-
-        // The world message is treated as the latest full list of players from the server.
-        playersToRemove.Clear();
-
-        foreach (string playerId in remotePlayers.Keys)
-        {
-            playersToRemove.Add(playerId);
-        }
-
-        foreach (NetworkPlayerInfo playerInfo in players)
-        {
-            if (playerInfo == null || string.IsNullOrEmpty(playerInfo.id))
-            {
-                continue;
-            }
-
-            if (playerInfo.id == networkClient.LocalPlayerId)
-            {
-                continue;
-            }
-
-            RemotePlayer remotePlayer = GetOrCreateRemotePlayer(playerInfo);
-            Vector3 position = new Vector3(playerInfo.x, playerInfo.y, playerInfo.z);
-            Quaternion rotation = Quaternion.Euler(playerInfo.pitch, playerInfo.yaw, playerInfo.roll);
-
-            remotePlayer.SetTarget(position, rotation);
-            remotePlayer.playerName = playerInfo.name;
-            remotePlayer.health = playerInfo.health;
-            remotePlayer.score = playerInfo.score;
-
-            playersToRemove.Remove(playerInfo.id);
-        }
-
-        for (int i = 0; i < playersToRemove.Count; i++)
-        {
-            RemovePlayer(playersToRemove[i]);
-        }
+        // TODO COURS 1 - Exercice 5:
+        // Le serveur envoie la liste complete des joueurs.
+        // 1. Ignorer le joueur local avec networkClient.LocalPlayerId.
+        // 2. Pour chaque autre joueur, appeler GetOrCreateRemotePlayer.
+        // 3. Construire position et rotation avec x/y/z et pitch/yaw/roll.
+        // 4. Appeler SetTarget sur le RemotePlayer.
+        // 5. Mettre a jour name, health et score.
+        // 6. Supprimer les joueurs qui ne sont plus dans la liste.
     }
 
     private RemotePlayer GetOrCreateRemotePlayer(NetworkPlayerInfo playerInfo)
     {
-        if (remotePlayers.TryGetValue(playerInfo.id, out RemotePlayer remotePlayer))
-        {
-            return remotePlayer;
-        }
-
-        GameObject ship = CreateShipObject(playerInfo);
-        remotePlayer = ship.GetComponent<RemotePlayer>();
-
-        if (remotePlayer == null)
-        {
-            remotePlayer = ship.AddComponent<RemotePlayer>();
-        }
-
-        remotePlayer.playerId = playerInfo.id;
-        remotePlayer.playerName = playerInfo.name;
-        remotePlayers.Add(playerInfo.id, remotePlayer);
-
-        return remotePlayer;
+        // TODO COURS 1 - Exercice 5:
+        // Si le joueur existe deja dans le dictionnaire, le retourner.
+        // Sinon, creer son GameObject avec CreateShipObject, ajouter/trouver RemotePlayer,
+        // remplir playerId/playerName, l'ajouter au dictionnaire, puis le retourner.
+        return null;
     }
 
     private GameObject CreateShipObject(NetworkPlayerInfo playerInfo)
@@ -162,14 +116,10 @@ public class RemotePlayerManager : MonoBehaviour
 
     private void HandleShootEvent(ShootEventMessage shootEvent)
     {
-        if (shootEvent == null || shootEvent.id == networkClient.LocalPlayerId)
-        {
-            return;
-        }
-
-        Vector3 position = new Vector3(shootEvent.x, shootEvent.y, shootEvent.z);
-        Vector3 direction = new Vector3(shootEvent.dx, shootEvent.dy, shootEvent.dz);
-        LaserVisual.Spawn(remoteLaserPrefab, position, direction);
+        // TODO COURS 1 - Exercice 5:
+        // Si le tir vient du joueur local, l'ignorer car il a deja affiche son laser.
+        // Sinon, construire position et direction depuis le message,
+        // puis appeler LaserVisual.Spawn pour afficher le laser distant.
     }
 
     private void RemovePlayer(string playerId)

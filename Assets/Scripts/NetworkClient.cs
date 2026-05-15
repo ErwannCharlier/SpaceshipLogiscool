@@ -70,13 +70,12 @@ public class NetworkClient : MonoBehaviour
 
     public void SendJoin(string playerName)
     {
-        JoinMessage message = new JoinMessage
-        {
-            type = "join",
-            name = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim()
-        };
-
-        SendJson(JsonUtility.ToJson(message));
+        // TODO COURS 1 - Exercice 1:
+        // 1. Creer un JoinMessage.
+        // 2. Mettre type = "join".
+        // 3. Mettre name = le nom du joueur, ou "Player" si le champ est vide.
+        // 4. Convertir le message en JSON avec JsonUtility.ToJson.
+        // 5. Envoyer le JSON avec SendJson.
     }
 
     public void SendPlayerState(Vector3 position, float yaw)
@@ -91,36 +90,20 @@ public class NetworkClient : MonoBehaviour
 
     public void SendPlayerState(Vector3 position, float yaw, float pitch, float roll)
     {
-        PlayerStateMessage message = new PlayerStateMessage
-        {
-            type = "state",
-            x = position.x,
-            y = position.y,
-            z = position.z,
-            yaw = yaw,
-            pitch = pitch,
-            roll = roll
-        };
-
-        SendJson(JsonUtility.ToJson(message));
+        // TODO COURS 1 - Exercice 1:
+        // Creer un PlayerStateMessage avec type = "state".
+        // Remplir x, y, z avec position, puis yaw, pitch, roll.
+        // Convertir en JSON et envoyer avec SendJson.
     }
 
     public void SendShoot(Vector3 position, Vector3 direction)
     {
-        Vector3 safeDirection = direction.sqrMagnitude > 0.001f ? direction.normalized : Vector3.forward;
-
-        ShootMessage message = new ShootMessage
-        {
-            type = "shoot",
-            x = position.x,
-            y = position.y,
-            z = position.z,
-            dx = safeDirection.x,
-            dy = safeDirection.y,
-            dz = safeDirection.z
-        };
-
-        SendJson(JsonUtility.ToJson(message));
+        // TODO COURS 1 - Exercice 1:
+        // 1. Normaliser la direction pour envoyer seulement une direction propre.
+        // 2. Creer un ShootMessage avec type = "shoot".
+        // 3. Remplir x, y, z avec position.
+        // 4. Remplir dx, dy, dz avec la direction normalisee.
+        // 5. Convertir en JSON et envoyer avec SendJson.
     }
 
     public async void SendJson(string json)
@@ -282,41 +265,16 @@ public class NetworkClient : MonoBehaviour
     {
         try
         {
-            // First read only the "type" field, then parse the same JSON into the right message class.
-            MessageTypeOnly messageType = JsonUtility.FromJson<MessageTypeOnly>(json);
-
-            switch (messageType.type)
-            {
-                case "welcome":
-                    WelcomeMessage welcome = JsonUtility.FromJson<WelcomeMessage>(json);
-                    LocalPlayerId = welcome.id;
-                    WelcomeReceived?.Invoke(welcome.id);
-                    break;
-
-                case "world":
-                    WorldMessage world = JsonUtility.FromJson<WorldMessage>(json);
-                    WorldReceived?.Invoke(world.players);
-                    break;
-
-                case "shoot_event":
-                    ShootEventMessage shootEvent = JsonUtility.FromJson<ShootEventMessage>(json);
-                    ShootEventReceived?.Invoke(shootEvent);
-                    break;
-
-                case "disconnect":
-                    DisconnectMessage disconnect = JsonUtility.FromJson<DisconnectMessage>(json);
-                    PlayerDisconnected?.Invoke(disconnect.id);
-                    break;
-
-                case "hit":
-                    HitMessage hit = JsonUtility.FromJson<HitMessage>(json);
-                    HitReceived?.Invoke(hit);
-                    break;
-
-                default:
-                    QueueStatus("Unknown message type: " + messageType.type);
-                    break;
-            }
+            // TODO COURS 1 - Exercice 2:
+            // 1. Lire seulement le champ "type" avec MessageTypeOnly.
+            // 2. Faire un switch sur messageType.type.
+            // 3. Pour chaque type, convertir le JSON dans la bonne classe.
+            // 4. Appeler l'event correspondant:
+            //    welcome -> LocalPlayerId + WelcomeReceived
+            //    world -> WorldReceived
+            //    shoot_event -> ShootEventReceived
+            //    disconnect -> PlayerDisconnected
+            //    hit -> HitReceived
         }
         catch (Exception exception)
         {

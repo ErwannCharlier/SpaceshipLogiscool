@@ -14,14 +14,9 @@ public class RemotePlayer : MonoBehaviour
 
     public void SetTarget(Vector3 position, Quaternion rotation)
     {
-        targetPosition = position;
-        targetRotation = rotation;
-
-        if (!hasTarget)
-        {
-            transform.SetPositionAndRotation(targetPosition, targetRotation);
-            hasTarget = true;
-        }
+        // TODO COURS 1 - Exercice 6:
+        // Sauvegarder la position et la rotation recues du serveur.
+        // La premiere fois, placer directement le vaisseau sur cette cible.
     }
 
     private void Update()
@@ -31,9 +26,9 @@ public class RemotePlayer : MonoBehaviour
             return;
         }
 
-        // Smooth remote movement so other ships do not snap between server updates.
-        float amount = Mathf.Clamp01(smoothingSpeed * Time.deltaTime);
-        transform.position = Vector3.Lerp(transform.position, targetPosition, amount);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, amount);
+        // TODO COURS 1 - Exercice 6:
+        // Calculer amount avec smoothingSpeed et Time.deltaTime.
+        // Interpoler position avec Vector3.Lerp.
+        // Interpoler rotation avec Quaternion.Slerp.
     }
 }

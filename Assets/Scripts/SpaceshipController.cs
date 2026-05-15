@@ -86,99 +86,30 @@ public class SpaceshipController : MonoBehaviour
 
     private void RotateShip()
     {
-        float keyboardTurn = 0f;
-        float rollInput = 0f;
-
-        if (Input.GetKey(KeyCode.LeftArrow))
-        {
-            keyboardTurn -= 1f;
-        }
-
-        if (Input.GetKey(KeyCode.RightArrow))
-        {
-            keyboardTurn += 1f;
-        }
-
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.Q))
-        {
-            rollInput += 1f;
-        }
-
-        if (Input.GetKey(KeyCode.D))
-        {
-            rollInput -= 1f;
-        }
-
-        yaw += keyboardTurn * turnSpeed * Time.deltaTime;
-        UpdateRoll(rollInput);
-
-        if (useMouseAim && Cursor.lockState == CursorLockMode.Locked)
-        {
-            float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-            float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
-
-            yaw += mouseX;
-
-            if (invertMouseY)
-            {
-                pitch += mouseY;
-            }
-            else
-            {
-                pitch -= mouseY;
-            }
-
-            pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
-        }
-
-        transform.rotation = Quaternion.Euler(pitch, yaw, roll);
+        // TODO COURS 1 - Exercice 3:
+        // 1. Utiliser la souris pour changer yaw et pitch quand le curseur est lock.
+        // 2. Utiliser A/Q et D pour calculer le roll.
+        // 3. Appeler UpdateRoll.
+        // 4. Appliquer la rotation finale avec Quaternion.Euler(pitch, yaw, roll).
     }
 
     private void UpdateRoll(float rollInput)
     {
-        if (Mathf.Abs(rollInput) > 0.01f)
-        {
-            roll += rollInput * rollSpeed * Time.deltaTime;
-        }
-        else
-        {
-            roll = Mathf.MoveTowards(roll, 0f, rollReturnSpeed * Time.deltaTime);
-        }
-
-        roll = Mathf.Clamp(roll, -maxRoll, maxRoll);
+        // TODO COURS 1 - Exercice 3:
+        // Si rollInput est different de 0, modifier roll avec rollSpeed.
+        // Sinon, ramener roll doucement vers 0 avec Mathf.MoveTowards.
+        // Toujours limiter roll entre -maxRoll et +maxRoll.
     }
 
     private void MoveShip()
     {
-        // W/Z both work, so the course is comfortable on QWERTY and AZERTY keyboards.
-        float forwardInput = 0f;
-        float verticalInput = 0f;
-
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.Z) || Input.GetKey(KeyCode.UpArrow))
-        {
-            forwardInput += 1f;
-        }
-
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
-        {
-            forwardInput -= 1f;
-        }
-
-        if (Input.GetKey(KeyCode.Space))
-        {
-            verticalInput += 1f;
-        }
-
-        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.LeftShift))
-        {
-            verticalInput -= 1f;
-        }
-
-        Vector3 movement = transform.forward * forwardInput * moveSpeed;
-        movement += Vector3.up * verticalInput * verticalSpeed;
-
-        transform.position += movement * Time.deltaTime;
-        ClampAltitude();
+        // TODO COURS 1 - Exercice 3:
+        // 1. Lire W/Z/UpArrow pour avancer.
+        // 2. Lire S/DownArrow pour reculer.
+        // 3. Lire Space pour monter et LeftControl/LeftShift pour descendre.
+        // 4. Construire un Vector3 movement avec transform.forward et Vector3.up.
+        // 5. Ajouter movement * Time.deltaTime a transform.position.
+        // 6. Appeler ClampAltitude.
     }
 
     private void ClampAltitude()
@@ -190,51 +121,21 @@ public class SpaceshipController : MonoBehaviour
 
     private void TryShoot()
     {
-        if (IsPointerOverUI())
-        {
-            return;
-        }
-
-        bool wantsToShoot = !lockedCursorThisFrame && (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.F));
-
-        if (!wantsToShoot || Time.time < nextFireTime)
-        {
-            return;
-        }
-
-        if (lockCursorOnClick && Cursor.lockState != CursorLockMode.Locked)
-        {
-            return;
-        }
-
-        nextFireTime = Time.time + fireCooldown;
-
-        Vector3 position = shootPoint != null ? shootPoint.position : transform.position + transform.forward;
-        Vector3 direction = transform.forward;
-
-        LaserVisual.Spawn(laserPrefab, position, direction);
-
-        if (networkClient != null)
-        {
-            networkClient.SendShoot(position, direction);
-        }
+        // TODO COURS 1 - Exercice 4:
+        // 1. Ne rien faire si la souris est sur l'UI.
+        // 2. Detecter clic gauche ou touche F.
+        // 3. Respecter fireCooldown avec Time.time et nextFireTime.
+        // 4. Choisir la position de depart: shootPoint si possible.
+        // 5. Afficher le laser avec LaserVisual.Spawn.
+        // 6. Envoyer le tir au serveur avec networkClient.SendShoot.
     }
 
     private void SendStateSometimes()
     {
-        if (networkClient == null || !networkClient.IsConnected || stateMessagesPerSecond <= 0f)
-        {
-            return;
-        }
-
-        stateTimer += Time.deltaTime;
-        float sendInterval = 1f / stateMessagesPerSecond;
-
-        if (stateTimer >= sendInterval)
-        {
-            stateTimer = 0f;
-            networkClient.SendPlayerState(transform.position, yaw, pitch, roll);
-        }
+        // TODO COURS 1 - Exercice 3:
+        // 1. Verifier que networkClient existe et qu'il est connecte.
+        // 2. Utiliser stateTimer pour envoyer seulement quelques messages par seconde.
+        // 3. Appeler SendPlayerState avec position, yaw, pitch et roll.
     }
 
     private bool IsPointerOverUI()
