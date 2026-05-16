@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "FlyingNugget.sln"
+    "dotnet.defaultSolution": "SpaceshipLogiscool.sln"
 }

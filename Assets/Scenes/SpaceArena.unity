@@ -459,7 +459,7 @@ MonoBehaviour:
   networkClient: {fileID: 2097458129}
   remoteShipPrefab: {fileID: 919132149155446097, guid: 7942e74102e606744af355232b01b336, type: 3}
   remoteLaserPrefab: {fileID: 0}
-  remotePlayersParent: {fileID: 0}
+  remotePlayersParent: {fileID: 167448243}
   remoteModelLocalPosition: {x: 0, y: 0, z: 0}
   remoteModelLocalEulerAngles: {x: -90, y: 0, z: 0}
   remoteModelLocalScale: {x: 100, y: 100, z: 100}
@@ -773,9 +773,9 @@ MonoBehaviour:
   maxRoll: 55
   rollReturnSpeed: 90
   fireCooldown: 0.4
-  shootPoint: {fileID: 0}
+  shootPoint: {fileID: 1228974882}
   laserPrefab: {fileID: 0}
-  networkClient: {fileID: 0}
+  networkClient: {fileID: 2097458129}
   stateMessagesPerSecond: 30
 --- !u!4 &779109585
 Transform:
@@ -1358,8 +1358,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -989, y: 240}
-  m_SizeDelta: {x: 160, y: 30}
+  m_AnchoredPosition: {x: -871, y: 383}
+  m_SizeDelta: {x: 160, y: 38.6635}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1429481457
 GameObject:
@@ -1505,7 +1505,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -993, y: 304}
+  m_AnchoredPosition: {x: -871, y: 329}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1636052975
@@ -1730,7 +1730,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -979, y: 157}
+  m_AnchoredPosition: {x: -871, y: 270}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!4 &1792386596 stripped
@@ -1770,7 +1770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e71b7e083fb64d4484be0464973967b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkClient: {fileID: 0}
+  networkClient: {fileID: 2097458129}
   playerNameInput: {fileID: 1636052976}
   serverUrlInput: {fileID: 989982895}
   connectButton: {fileID: 151526650}
@@ -2148,7 +2148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fab1a8d37561af34899f74b018cf98f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverUrl: ws://unity.erwann.xyz
+  serverUrl: wss://unity.erwann.xyz
   connectOnStart: 0
 --- !u!4 &2097458130
 Transform:
