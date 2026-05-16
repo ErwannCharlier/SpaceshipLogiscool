@@ -74,4 +74,4 @@ pip-wheel-metadata/
 Thumbs.db
 Desktop.ini
 
-aaa.app/
+*.app/
