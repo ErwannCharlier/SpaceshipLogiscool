@@ -773,9 +773,9 @@ MonoBehaviour:
   maxRoll: 55
   rollReturnSpeed: 90
   fireCooldown: 0.4
-  shootPoint: {fileID: 0}
+  shootPoint: {fileID: 1228974882}
   laserPrefab: {fileID: 0}
-  networkClient: {fileID: 0}
+  networkClient: {fileID: 2097458129}
   stateMessagesPerSecond: 30
 --- !u!4 &779109585
 Transform:
@@ -1770,7 +1770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e71b7e083fb64d4484be0464973967b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkClient: {fileID: 0}
+  networkClient: {fileID: 2097458129}
   playerNameInput: {fileID: 1636052976}
   serverUrlInput: {fileID: 989982895}
   connectButton: {fileID: 151526650}
@@ -2148,7 +2148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fab1a8d37561af34899f74b018cf98f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverUrl: ws://unity.erwann.xyz
+  serverUrl: wss://unity.erwann.xyz
   connectOnStart: 0
 --- !u!4 &2097458130
 Transform:
