@@ -2,6 +2,7 @@ import asyncio
 import json
 import math
 import os
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -15,10 +16,20 @@ MIN_ALTITUDE = 1.0
 MAX_ALTITUDE = 20.0
 MAX_NAME_LENGTH = 16
 
+SPAWN_POSITION = (0.0, 5.0, 0.0)
+MAX_HEALTH = 100
+MAX_ENERGY = 100.0
+RESPAWN_DELAY = 3.0
+ENERGY_COST_PER_UNIT = 0.2
+ENERGY_RECHARGE_PER_SECOND = 30.0
+
 SHOT_RANGE = 80.0
 HIT_RADIUS = 1.5
 SHOT_DAMAGE = 25
 WORLD_MESSAGES_PER_SECOND = 10
+
+STATION_POSITION = (20.0, 3.0, 20.0)
+STATION_SIZE = 6.0
 
 
 @dataclass
@@ -26,14 +37,17 @@ class Player:
     id: str
     name: str
     websocket: object
-    x: float = 0.0
-    y: float = 5.0
-    z: float = 0.0
+    x: float = SPAWN_POSITION[0]
+    y: float = SPAWN_POSITION[1]
+    z: float = SPAWN_POSITION[2]
     yaw: float = 0.0
     pitch: float = 0.0
     roll: float = 0.0
-    health: int = 100
+    health: int = MAX_HEALTH
+    energy: float = MAX_ENERGY
     score: int = 0
+    is_alive: bool = True
+    respawn_end_time: float = 0.0
 
 
 players = {}
@@ -62,10 +76,27 @@ def number_from_message(message, key, default=0.0):
         return default
 
 
-def make_world_message():
+def make_station_message():
+    return {
+        "x": STATION_POSITION[0],
+        "y": STATION_POSITION[1],
+        "z": STATION_POSITION[2],
+        "size": STATION_SIZE,
+    }
+
+
+def make_world_message(now=None):
+    if now is None:
+        now = time.monotonic()
+
     player_list = []
 
     for player in list(players.values()):
+        respawn_seconds = 0.0
+
+        if not player.is_alive:
+            respawn_seconds = max(0.0, player.respawn_end_time - now)
+
         player_list.append(
             {
                 "id": player.id,
@@ -77,11 +108,92 @@ def make_world_message():
                 "pitch": player.pitch,
                 "roll": player.roll,
                 "health": player.health,
+                "energy": player.energy,
                 "score": player.score,
+                "isAlive": player.is_alive,
+                "respawnSeconds": respawn_seconds,
             }
         )
 
-    return {"type": "world", "players": player_list}
+    return {"type": "world", "players": player_list, "station": make_station_message()}
+
+
+def reset_player_at_spawn(player):
+    player.x = SPAWN_POSITION[0]
+    player.y = SPAWN_POSITION[1]
+    player.z = SPAWN_POSITION[2]
+    player.yaw = 0.0
+    player.pitch = 0.0
+    player.roll = 0.0
+
+
+def kill_player(player, reason, now=None):
+    if player is None or not player.is_alive:
+        return
+
+    if now is None:
+        now = time.monotonic()
+
+    if reason == "energy":
+        player.energy = 0.0
+    else:
+        player.health = 0
+
+    player.is_alive = False
+    player.respawn_end_time = now + RESPAWN_DELAY
+
+
+def try_respawn_player(player, now):
+    if player.is_alive or now < player.respawn_end_time:
+        return False
+
+    reset_player_at_spawn(player)
+    player.health = MAX_HEALTH
+    player.energy = MAX_ENERGY
+    player.is_alive = True
+    player.respawn_end_time = 0.0
+    return True
+
+
+def drain_energy_from_movement(player, old_position, new_position):
+    if player is None or not player.is_alive:
+        return
+
+    move_distance = distance(old_position, new_position)
+
+    if move_distance <= 0.0001:
+        return
+
+    player.energy = max(0.0, player.energy - move_distance * ENERGY_COST_PER_UNIT)
+
+    if player.energy <= 0.0:
+        kill_player(player, "energy")
+
+
+def is_player_inside_station(player):
+    half_size = STATION_SIZE * 0.5
+
+    return (
+        abs(player.x - STATION_POSITION[0]) <= half_size
+        and abs(player.y - STATION_POSITION[1]) <= half_size
+        and abs(player.z - STATION_POSITION[2]) <= half_size
+    )
+
+
+def recharge_player(player, delta_time):
+    if player is None or not player.is_alive:
+        return
+
+    player.energy = min(MAX_ENERGY, player.energy + ENERGY_RECHARGE_PER_SECOND * delta_time)
+
+
+def update_players(delta_time, now):
+    for player in list(players.values()):
+        if player.is_alive:
+            if is_player_inside_station(player):
+                recharge_player(player, delta_time)
+        else:
+            try_respawn_player(player, now)
 
 
 async def send_json(websocket, message):
@@ -107,12 +219,21 @@ async def broadcast(message):
 
 async def broadcast_world_loop():
     delay = 1.0 / WORLD_MESSAGES_PER_SECOND
+    last_time = time.monotonic()
 
     while True:
         await asyncio.sleep(delay)
 
-        if len(players) > 0:
-            await broadcast(make_world_message())
+        if len(players) == 0:
+            last_time = time.monotonic()
+            continue
+
+        now = time.monotonic()
+        delta_time = now - last_time
+        last_time = now
+
+        update_players(delta_time, now)
+        await broadcast(make_world_message(now))
 
 
 async def handle_client(websocket):
@@ -155,6 +276,7 @@ async def handle_join(websocket, message):
         websocket=websocket,
     )
 
+    reset_player_at_spawn(player)
     players[websocket] = player
 
     await send_json(websocket, {"type": "welcome", "id": player.id})
@@ -166,21 +288,26 @@ async def handle_join(websocket, message):
 def handle_state(websocket, message):
     player = players.get(websocket)
 
-    if player is None:
+    if player is None or not player.is_alive:
         return
 
+    old_position = (player.x, player.y, player.z)
+
     player.x = number_from_message(message, "x")
-    player.y = clamp(number_from_message(message, "y", 5.0), MIN_ALTITUDE, MAX_ALTITUDE)
+    player.y = clamp(number_from_message(message, "y", SPAWN_POSITION[1]), MIN_ALTITUDE, MAX_ALTITUDE)
     player.z = number_from_message(message, "z")
     player.yaw = number_from_message(message, "yaw")
     player.pitch = number_from_message(message, "pitch")
     player.roll = number_from_message(message, "roll")
 
+    new_position = (player.x, player.y, player.z)
+    drain_energy_from_movement(player, old_position, new_position)
+
 
 async def handle_shoot(websocket, message):
     shooter = players.get(websocket)
 
-    if shooter is None:
+    if shooter is None or not shooter.is_alive:
         return
 
     shot_position = (
@@ -219,7 +346,7 @@ async def handle_shoot(websocket, message):
 
     if target.health == 0:
         shooter.score += 1
-        target.health = 100
+        kill_player(target, "health")
 
     await broadcast({"type": "hit", "targetId": target.id, "health": target.health})
     await broadcast(make_world_message())
@@ -240,7 +367,7 @@ def find_hit_player(shooter, shot_position, shot_direction):
     closest_distance_along_ray = SHOT_RANGE
 
     for target in players.values():
-        if target.id == shooter.id:
+        if target.id == shooter.id or not target.is_alive:
             continue
 
         distance_to_ray, distance_along_ray = ray_distance_to_player(

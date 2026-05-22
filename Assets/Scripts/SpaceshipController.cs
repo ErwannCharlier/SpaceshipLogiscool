@@ -28,6 +28,9 @@ public class SpaceshipController : MonoBehaviour
     public Transform shootPoint;
     public GameObject laserPrefab;
 
+    [Header("Effects")]
+    public GameObject explosionPrefab;
+
     [Header("Networking")]
     public NetworkClient networkClient;
     public float stateMessagesPerSecond = 10f;
@@ -38,40 +41,180 @@ public class SpaceshipController : MonoBehaviour
     private float pitch;
     private float roll;
     private bool lockedCursorThisFrame;
+    private bool isAlive = true;
+    private bool hasLocalWorldState;
+    private Renderer[] shipRenderers;
 
-    private void Start()
+    private void Awake()
     {
         if (networkClient == null)
         {
             networkClient = FindObjectOfType<NetworkClient>();
         }
 
+        shipRenderers = GetComponentsInChildren<Renderer>(true);
+    }
+
+    private void OnEnable()
+    {
+        if (networkClient != null)
+        {
+            networkClient.WorldReceived += HandleWorld;
+            networkClient.Disconnected += HandleDisconnected;
+        }
+    }
+
+    private void Start()
+    {
         yaw = transform.eulerAngles.y;
         pitch = 0f;
         roll = 0f;
         transform.rotation = Quaternion.Euler(pitch, yaw, roll);
         ClampAltitude();
+        SetShipVisible(true);
+    }
+
+    private void OnDisable()
+    {
+        if (networkClient != null)
+        {
+            networkClient.WorldReceived -= HandleWorld;
+            networkClient.Disconnected -= HandleDisconnected;
+        }
     }
 
     private void Update()
     {
         lockedCursorThisFrame = false;
         UpdateCursorLock();
+
+        if (!CanControlShip())
+        {
+            return;
+        }
+
         RotateShip();
         MoveShip();
         TryShoot();
         SendStateSometimes();
     }
 
+    public bool CanControlShip()
+    {
+        return isAlive;
+    }
+
+    public void HandleLocalPlayerWorldState(NetworkPlayerInfo playerInfo)
+    {
+        if (playerInfo == null)
+        {
+            return;
+        }
+
+        bool wasAlive = isAlive;
+        isAlive = playerInfo.isAlive;
+
+        if (!hasLocalWorldState)
+        {
+            ApplyServerTransform(playerInfo);
+            hasLocalWorldState = true;
+            SetShipVisible(isAlive);
+            return;
+        }
+
+        if (wasAlive && !isAlive)
+        {
+            ApplyServerTransform(playerInfo);
+            PlayExplosion();
+            SetShipVisible(false);
+            UnlockCursor();
+            return;
+        }
+
+        if (!wasAlive && isAlive)
+        {
+            ApplyServerTransform(playerInfo);
+            SetShipVisible(true);
+            return;
+        }
+
+        if (!isAlive)
+        {
+            ApplyServerTransform(playerInfo);
+        }
+    }
+
+    public void SetShipVisible(bool isVisible)
+    {
+        if (shipRenderers == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < shipRenderers.Length; i++)
+        {
+            if (shipRenderers[i] != null)
+            {
+                shipRenderers[i].enabled = isVisible;
+            }
+        }
+    }
+
+    public void PlayExplosion()
+    {
+        ExplosionVisual.Spawn(transform.position, explosionPrefab);
+    }
+
+    private void HandleWorld(NetworkPlayerInfo[] players)
+    {
+        if (players == null || networkClient == null || string.IsNullOrEmpty(networkClient.LocalPlayerId))
+        {
+            return;
+        }
+
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (players[i] != null && players[i].id == networkClient.LocalPlayerId)
+            {
+                HandleLocalPlayerWorldState(players[i]);
+                return;
+            }
+        }
+    }
+
+    private void HandleDisconnected()
+    {
+        isAlive = true;
+        hasLocalWorldState = false;
+        SetShipVisible(true);
+        UnlockCursor();
+    }
+
+    private void ApplyServerTransform(NetworkPlayerInfo playerInfo)
+    {
+        yaw = playerInfo.yaw;
+        pitch = playerInfo.pitch;
+        roll = playerInfo.roll;
+        transform.SetPositionAndRotation(
+            new Vector3(playerInfo.x, playerInfo.y, playerInfo.z),
+            Quaternion.Euler(pitch, yaw, roll)
+        );
+    }
+
+    private void UnlockCursor()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
     private void UpdateCursorLock()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            UnlockCursor();
         }
 
-        if (!lockCursorOnClick || IsPointerOverUI())
+        if (!CanControlShip() || !lockCursorOnClick || IsPointerOverUI())
         {
             return;
         }

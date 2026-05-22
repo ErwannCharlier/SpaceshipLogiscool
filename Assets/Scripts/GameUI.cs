@@ -18,9 +18,22 @@ public class GameUI : MonoBehaviour
     public Text healthText;
     public Text scoreText;
 
+    private const float MaxStatValue = 100f;
+
     private string pendingPlayerName = "Player";
-    private int localHealth = 100;
+    private float localHealth = MaxStatValue;
+    private float localEnergy = MaxStatValue;
     private int localScore = 0;
+    private bool localIsAlive = true;
+    private float localRespawnSeconds = 0f;
+
+    private Image healthBarFill;
+    private Image energyBarFill;
+    private Text healthValueText;
+    private Text energyLabelText;
+    private Text energyValueText;
+    private Text respawnText;
+    private static Sprite defaultUiSprite;
 
     private void Awake()
     {
@@ -28,6 +41,13 @@ public class GameUI : MonoBehaviour
         {
             networkClient = FindObjectOfType<NetworkClient>();
         }
+
+        if (defaultUiSprite == null)
+        {
+            defaultUiSprite = CreateDefaultSprite();
+        }
+
+        CreateHudIfNeeded();
     }
 
     private void OnEnable()
@@ -59,6 +79,7 @@ public class GameUI : MonoBehaviour
             serverUrlInput.text = networkClient.serverUrl;
         }
 
+        CreateHudIfNeeded();
         HandleStatusChanged(networkClient != null ? networkClient.LastStatus : "No NetworkClient");
         UpdateStatsText();
         UpdateButtons();
@@ -136,7 +157,10 @@ public class GameUI : MonoBehaviour
 
     private void HandleDisconnected()
     {
+        localRespawnSeconds = 0f;
+        localIsAlive = true;
         SetConnectionPanelVisible(true);
+        UpdateRespawnText();
         UpdateButtons();
     }
 
@@ -164,7 +188,10 @@ public class GameUI : MonoBehaviour
             if (player != null && player.id == networkClient.LocalPlayerId)
             {
                 localHealth = player.health;
+                localEnergy = player.energy;
                 localScore = player.score;
+                localIsAlive = player.isAlive;
+                localRespawnSeconds = player.respawnSeconds;
                 UpdateStatsText();
                 return;
             }
@@ -176,20 +203,197 @@ public class GameUI : MonoBehaviour
         if (hit != null && networkClient != null && hit.targetId == networkClient.LocalPlayerId)
         {
             localHealth = hit.health;
-            UpdateStatsText();
+            UpdateHealthBar();
         }
+    }
+
+    private void CreateHudIfNeeded()
+    {
+        if (healthText == null || healthBarFill != null)
+        {
+            return;
+        }
+
+        ConfigureLabel(healthText, "Health");
+        CreateBarForLabel(healthText, "Health Bar", new Color(0.95f, 0.2f, 0.2f, 1f), out healthBarFill, out healthValueText);
+
+        energyLabelText = CreateLabelCopy(
+            "Energy",
+            healthText,
+            healthText.rectTransform.anchoredPosition + new Vector2(0f, -40f)
+        );
+        CreateBarForLabel(energyLabelText, "Energy Bar", new Color(0.2f, 0.75f, 1f, 1f), out energyBarFill, out energyValueText);
+
+        respawnText = CreateLabelCopy(
+            "Respawn Text",
+            healthText,
+            energyLabelText.rectTransform.anchoredPosition + new Vector2(145f, -40f)
+        );
+        respawnText.alignment = TextAnchor.MiddleLeft;
+        respawnText.text = string.Empty;
+        respawnText.gameObject.SetActive(false);
+    }
+
+    private void ConfigureLabel(Text label, string value)
+    {
+        if (label == null)
+        {
+            return;
+        }
+
+        label.text = value;
+        label.alignment = TextAnchor.MiddleLeft;
+        label.raycastTarget = false;
+    }
+
+    private Text CreateLabelCopy(string objectName, Text template, Vector2 anchoredPosition)
+    {
+        GameObject labelObject = new GameObject(objectName, typeof(RectTransform));
+        labelObject.transform.SetParent(template.transform.parent, false);
+
+        RectTransform rectTransform = labelObject.GetComponent<RectTransform>();
+        rectTransform.anchorMin = template.rectTransform.anchorMin;
+        rectTransform.anchorMax = template.rectTransform.anchorMax;
+        rectTransform.pivot = template.rectTransform.pivot;
+        rectTransform.sizeDelta = template.rectTransform.sizeDelta;
+        rectTransform.anchoredPosition = anchoredPosition;
+
+        Text label = labelObject.AddComponent<Text>();
+        CopyTextStyle(template, label);
+        ConfigureLabel(label, objectName);
+        return label;
+    }
+
+    private void CreateBarForLabel(Text label, string objectName, Color fillColor, out Image fillImage, out Text valueText)
+    {
+        GameObject barObject = new GameObject(objectName, typeof(RectTransform));
+        barObject.transform.SetParent(label.transform.parent, false);
+
+        RectTransform barRect = barObject.GetComponent<RectTransform>();
+        barRect.anchorMin = label.rectTransform.anchorMin;
+        barRect.anchorMax = label.rectTransform.anchorMax;
+        barRect.pivot = label.rectTransform.pivot;
+        barRect.sizeDelta = new Vector2(220f, 22f);
+        barRect.anchoredPosition = label.rectTransform.anchoredPosition + new Vector2(145f, 0f);
+
+        Image background = barObject.AddComponent<Image>();
+        background.sprite = defaultUiSprite;
+        background.type = Image.Type.Simple;
+        background.color = new Color(0.08f, 0.1f, 0.15f, 0.9f);
+
+        GameObject fillObject = new GameObject("Fill", typeof(RectTransform));
+        fillObject.transform.SetParent(barObject.transform, false);
+
+        RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(2f, 2f);
+        fillRect.offsetMax = new Vector2(-2f, -2f);
+
+        fillImage = fillObject.AddComponent<Image>();
+        fillImage.sprite = defaultUiSprite;
+        fillImage.type = Image.Type.Filled;
+        fillImage.fillMethod = Image.FillMethod.Horizontal;
+        fillImage.fillOrigin = 0;
+        fillImage.color = fillColor;
+
+        GameObject valueObject = new GameObject("Value", typeof(RectTransform));
+        valueObject.transform.SetParent(barObject.transform, false);
+
+        RectTransform valueRect = valueObject.GetComponent<RectTransform>();
+        valueRect.anchorMin = Vector2.zero;
+        valueRect.anchorMax = Vector2.one;
+        valueRect.offsetMin = Vector2.zero;
+        valueRect.offsetMax = Vector2.zero;
+
+        valueText = valueObject.AddComponent<Text>();
+        CopyTextStyle(label, valueText);
+        valueText.alignment = TextAnchor.MiddleCenter;
+        valueText.color = Color.white;
+        valueText.text = "100 / 100";
+        valueText.raycastTarget = false;
+    }
+
+    private void CopyTextStyle(Text source, Text target)
+    {
+        target.font = source.font;
+        target.fontSize = source.fontSize;
+        target.fontStyle = source.fontStyle;
+        target.color = source.color;
+        target.lineSpacing = source.lineSpacing;
+        target.supportRichText = source.supportRichText;
+        target.horizontalOverflow = source.horizontalOverflow;
+        target.verticalOverflow = source.verticalOverflow;
+        target.raycastTarget = false;
+    }
+
+    private Sprite CreateDefaultSprite()
+    {
+        Sprite sprite = Sprite.Create(
+            Texture2D.whiteTexture,
+            new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height),
+            new Vector2(0.5f, 0.5f)
+        );
+
+        sprite.name = "RuntimeWhiteSprite";
+        return sprite;
     }
 
     private void UpdateStatsText()
     {
-        if (healthText != null)
+        UpdateHealthBar();
+        UpdateEnergyBar();
+        UpdateScoreText();
+        UpdateRespawnText();
+    }
+
+    public void UpdateHealthBar()
+    {
+        if (healthBarFill != null)
         {
-            healthText.text = "Health: " + localHealth;
+            healthBarFill.fillAmount = Mathf.Clamp01(localHealth / MaxStatValue);
         }
 
+        if (healthValueText != null)
+        {
+            healthValueText.text = Mathf.RoundToInt(localHealth) + " / 100";
+        }
+    }
+
+    public void UpdateEnergyBar()
+    {
+        if (energyBarFill != null)
+        {
+            energyBarFill.fillAmount = Mathf.Clamp01(localEnergy / MaxStatValue);
+        }
+
+        if (energyValueText != null)
+        {
+            energyValueText.text = Mathf.RoundToInt(localEnergy) + " / 100";
+        }
+    }
+
+    private void UpdateScoreText()
+    {
         if (scoreText != null)
         {
             scoreText.text = "Score: " + localScore;
+        }
+    }
+
+    public void UpdateRespawnText()
+    {
+        if (respawnText == null)
+        {
+            return;
+        }
+
+        bool shouldShowRespawn = !localIsAlive && localRespawnSeconds > 0f;
+        respawnText.gameObject.SetActive(shouldShowRespawn);
+
+        if (shouldShowRespawn)
+        {
+            respawnText.text = "Respawn dans: " + localRespawnSeconds.ToString("0.0") + "s";
         }
     }
 

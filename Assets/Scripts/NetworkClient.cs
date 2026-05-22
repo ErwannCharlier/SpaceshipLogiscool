@@ -17,12 +17,14 @@ public class NetworkClient : MonoBehaviour
     public string LastStatus { get; private set; } = "Disconnected";
     public bool IsConnected => socket != null && socket.State == WebSocketState.Open;
     public bool IsConnecting { get; private set; }
+    public StationInfo CurrentStation { get; private set; }
 
     public event Action Connected;
     public event Action Disconnected;
     public event Action<string> StatusChanged;
     public event Action<string> WelcomeReceived;
     public event Action<NetworkPlayerInfo[]> WorldReceived;
+    public event Action<StationInfo> StationReceived;
     public event Action<ShootEventMessage> ShootEventReceived;
     public event Action<string> PlayerDisconnected;
     public event Action<HitMessage> HitReceived;
@@ -32,6 +34,11 @@ public class NetworkClient : MonoBehaviour
     private readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1);
     private readonly ConcurrentQueue<string> receivedJson = new ConcurrentQueue<string>();
     private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
+
+    private void Awake()
+    {
+        EnsureStationVisualManager();
+    }
 
     private void Start()
     {
@@ -126,6 +133,18 @@ public class NetworkClient : MonoBehaviour
     public async void SendJson(string json)
     {
         await SendJsonAsync(json);
+    }
+
+    private void EnsureStationVisualManager()
+    {
+        StationVisualManager stationVisualManager = GetComponent<StationVisualManager>();
+
+        if (stationVisualManager == null)
+        {
+            stationVisualManager = gameObject.AddComponent<StationVisualManager>();
+        }
+
+        stationVisualManager.networkClient = this;
     }
 
     private async Task ConnectAsync()
@@ -295,7 +314,9 @@ public class NetworkClient : MonoBehaviour
 
                 case "world":
                     WorldMessage world = JsonUtility.FromJson<WorldMessage>(json);
+                    CurrentStation = world.station;
                     WorldReceived?.Invoke(world.players);
+                    StationReceived?.Invoke(world.station);
                     break;
 
                 case "shoot_event":
@@ -355,8 +376,12 @@ public class NetworkClient : MonoBehaviour
     {
         mainThreadActions.Enqueue(() =>
         {
+            IsConnecting = false;
+            LocalPlayerId = null;
+            CurrentStation = null;
             LastStatus = "Disconnected";
             StatusChanged?.Invoke(LastStatus);
+            StationReceived?.Invoke(null);
             Disconnected?.Invoke();
         });
     }
@@ -420,6 +445,7 @@ public class WorldMessage
 {
     public string type;
     public NetworkPlayerInfo[] players;
+    public StationInfo station;
 }
 
 [Serializable]
@@ -434,7 +460,19 @@ public class NetworkPlayerInfo
     public float pitch;
     public float roll;
     public int health;
+    public float energy;
     public int score;
+    public bool isAlive;
+    public float respawnSeconds;
+}
+
+[Serializable]
+public class StationInfo
+{
+    public float x;
+    public float y;
+    public float z;
+    public float size;
 }
 
 [Serializable]
