@@ -314,9 +314,11 @@ public class NetworkClient : MonoBehaviour
 
                 case "world":
                     WorldMessage world = JsonUtility.FromJson<WorldMessage>(json);
-                    CurrentStation = world.station;
+
+                    // TODO Cours 2:
+                    // 1. Stocke la station recue dans CurrentStation.
+                    // 2. Appelle l'event StationReceived avec world.station.
                     WorldReceived?.Invoke(world.players);
-                    StationReceived?.Invoke(world.station);
                     break;
 
                 case "shoot_event":

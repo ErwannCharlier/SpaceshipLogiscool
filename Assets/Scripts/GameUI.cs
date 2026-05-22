@@ -462,28 +462,14 @@ public class GameUI : MonoBehaviour
 
     public void UpdateHealthBar()
     {
-        if (healthBarFill != null)
-        {
-            healthBarFill.fillAmount = Mathf.Clamp01(localHealth / MaxStatValue);
-        }
-
-        if (healthValueText != null)
-        {
-            healthValueText.text = Mathf.RoundToInt(localHealth) + " / 100";
-        }
+        // TODO Cours 2:
+        // Mets a jour la barre de vie et le texte "100 / 100".
     }
 
     public void UpdateEnergyBar()
     {
-        if (energyBarFill != null)
-        {
-            energyBarFill.fillAmount = Mathf.Clamp01(localEnergy / MaxStatValue);
-        }
-
-        if (energyValueText != null)
-        {
-            energyValueText.text = Mathf.RoundToInt(localEnergy) + " / 100";
-        }
+        // TODO Cours 2:
+        // Mets a jour la barre d'energie et son texte.
     }
 
     private void UpdateScoreText()
@@ -496,18 +482,8 @@ public class GameUI : MonoBehaviour
 
     public void UpdateRespawnText()
     {
-        if (respawnText == null)
-        {
-            return;
-        }
-
-        bool shouldShowRespawn = !localIsAlive && localRespawnSeconds > 0f;
-        respawnText.gameObject.SetActive(shouldShowRespawn);
-
-        if (shouldShowRespawn)
-        {
-            respawnText.text = "Respawn dans: " + localRespawnSeconds.ToString("0.0") + "s";
-        }
+        // TODO Cours 2:
+        // Affiche "Respawn dans: 2.4s" seulement quand le joueur est mort.
     }
 
     private void UpdateButtons()

@@ -54,30 +54,11 @@ public class StationVisualManager : MonoBehaviour
 
     public void CreateStationVisual()
     {
-        if (stationObject != null)
-        {
-            return;
-        }
-
-        stationObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        stationObject.name = "Energy Station";
-        stationObject.transform.SetParent(transform, false);
-
-        Collider stationCollider = stationObject.GetComponent<Collider>();
-
-        if (stationCollider != null)
-        {
-            Destroy(stationCollider);
-        }
-
-        stationRenderer = stationObject.GetComponent<Renderer>();
-
-        if (stationRenderer != null)
-        {
-            stationRenderer.material = CreateStationMaterial(stationColor);
-            stationRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            stationRenderer.receiveShadows = false;
-        }
+        // TODO Cours 2:
+        // 1. Cree un cube avec GameObject.CreatePrimitive.
+        // 2. Donne-lui le nom "Energy Station".
+        // 3. Retire son collider.
+        // 4. Applique un materiau transparent bleu.
     }
 
     public void UpdateStationVisual(StationInfo stationInfo)

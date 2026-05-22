@@ -126,42 +126,12 @@ public class SpaceshipController : MonoBehaviour
 
     public void HandleLocalPlayerWorldState(NetworkPlayerInfo playerInfo)
     {
-        if (playerInfo == null)
-        {
-            return;
-        }
-
-        bool wasAlive = isAlive;
-        isAlive = playerInfo.isAlive;
-
-        if (!hasLocalWorldState)
-        {
-            ApplyServerTransform(playerInfo);
-            hasLocalWorldState = true;
-            SetShipVisible(isAlive);
-            return;
-        }
-
-        if (wasAlive && !isAlive)
-        {
-            ApplyServerTransform(playerInfo);
-            PlayExplosion();
-            SetShipVisible(false);
-            UnlockCursor();
-            return;
-        }
-
-        if (!wasAlive && isAlive)
-        {
-            ApplyServerTransform(playerInfo);
-            SetShipVisible(true);
-            return;
-        }
-
-        if (!isAlive)
-        {
-            ApplyServerTransform(playerInfo);
-        }
+        // TODO Cours 2:
+        // 1. Lis playerInfo.isAlive et compare avec l'ancien etat.
+        // 2. Gere le premier message avec hasLocalWorldState.
+        // 3. Si le joueur meurt: ApplyServerTransform, PlayExplosion, SetShipVisible(false), UnlockCursor().
+        // 4. Si le joueur respawn: ApplyServerTransform puis SetShipVisible(true).
+        // 5. Tant que le joueur est mort, continue de recopier la position serveur.
     }
 
     public void SetShipVisible(bool isVisible)
