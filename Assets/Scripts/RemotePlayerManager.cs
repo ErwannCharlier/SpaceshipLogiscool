@@ -87,11 +87,7 @@ public class RemotePlayerManager : MonoBehaviour
             Vector3 position = new Vector3(playerInfo.x, playerInfo.y, playerInfo.z);
             Quaternion rotation = Quaternion.Euler(playerInfo.pitch, playerInfo.yaw, playerInfo.roll);
 
-            remotePlayer.SetTarget(position, rotation);
-            remotePlayer.playerName = playerInfo.name;
-            remotePlayer.health = playerInfo.health;
-            remotePlayer.score = playerInfo.score;
-
+            remotePlayer.ApplyWorldState(playerInfo, position, rotation);
             playersToRemove.Remove(playerInfo.id);
         }
 
