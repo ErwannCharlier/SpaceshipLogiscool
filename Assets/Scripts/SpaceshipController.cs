@@ -104,6 +104,26 @@ public class SpaceshipController : MonoBehaviour
         return isAlive;
     }
 
+    public Vector3 GetShootOrigin()
+    {
+        if (shootPoint != null)
+        {
+            return shootPoint.position;
+        }
+
+        return transform.position + transform.forward;
+    }
+
+    public Vector3 GetShootDirection()
+    {
+        return transform.forward;
+    }
+
+    public Vector3 GetLaserAimPoint(float distance)
+    {
+        return GetShootOrigin() + GetShootDirection() * distance;
+    }
+
     public void HandleLocalPlayerWorldState(NetworkPlayerInfo playerInfo)
     {
         if (playerInfo == null)
@@ -352,8 +372,8 @@ public class SpaceshipController : MonoBehaviour
 
         nextFireTime = Time.time + fireCooldown;
 
-        Vector3 position = shootPoint != null ? shootPoint.position : transform.position + transform.forward;
-        Vector3 direction = transform.forward;
+        Vector3 position = GetShootOrigin();
+        Vector3 direction = GetShootDirection();
 
         LaserVisual.Spawn(laserPrefab, position, direction);
 
