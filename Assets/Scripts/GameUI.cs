@@ -19,6 +19,7 @@ public class GameUI : MonoBehaviour
     public Text scoreText;
 
     private const float MaxStatValue = 100f;
+    private const float CrosshairDistance = 80f;
 
     private string pendingPlayerName = "Player";
     private float localHealth = MaxStatValue;
@@ -33,6 +34,11 @@ public class GameUI : MonoBehaviour
     private Text energyLabelText;
     private Text energyValueText;
     private Text respawnText;
+    private GameObject crosshairRoot;
+    private RectTransform crosshairRect;
+    private RectTransform hudRect;
+    private Camera targetCamera;
+    private SpaceshipController localPlayerController;
     private static Sprite defaultUiSprite;
 
     private void Awake()
@@ -41,6 +47,9 @@ public class GameUI : MonoBehaviour
         {
             networkClient = FindObjectOfType<NetworkClient>();
         }
+
+        localPlayerController = FindObjectOfType<SpaceshipController>();
+        targetCamera = Camera.main;
 
         if (defaultUiSprite == null)
         {
@@ -107,6 +116,11 @@ public class GameUI : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        UpdateCrosshairPosition();
+    }
+
     private void ConnectButtonClicked()
     {
         if (networkClient == null)
@@ -152,6 +166,7 @@ public class GameUI : MonoBehaviour
     {
         networkClient.SendJoin(pendingPlayerName);
         SetConnectionPanelVisible(false);
+        UpdateCrosshairVisible();
         UpdateButtons();
     }
 
@@ -161,6 +176,7 @@ public class GameUI : MonoBehaviour
         localIsAlive = true;
         SetConnectionPanelVisible(true);
         UpdateRespawnText();
+        UpdateCrosshairVisible();
         UpdateButtons();
     }
 
@@ -193,6 +209,7 @@ public class GameUI : MonoBehaviour
                 localIsAlive = player.isAlive;
                 localRespawnSeconds = player.respawnSeconds;
                 UpdateStatsText();
+                UpdateCrosshairVisible();
                 return;
             }
         }
@@ -232,6 +249,8 @@ public class GameUI : MonoBehaviour
         respawnText.alignment = TextAnchor.MiddleLeft;
         respawnText.text = string.Empty;
         respawnText.gameObject.SetActive(false);
+
+        CreateCrosshairIfNeeded();
     }
 
     private void ConfigureLabel(Text label, string value)
@@ -339,6 +358,100 @@ public class GameUI : MonoBehaviour
         return sprite;
     }
 
+    private void CreateCrosshairIfNeeded()
+    {
+        if (healthText == null || crosshairRoot != null)
+        {
+            return;
+        }
+
+        crosshairRoot = new GameObject("Crosshair", typeof(RectTransform));
+        crosshairRoot.transform.SetParent(healthText.transform.parent, false);
+
+        crosshairRect = crosshairRoot.GetComponent<RectTransform>();
+        crosshairRect.anchorMin = new Vector2(0.5f, 0.5f);
+        crosshairRect.anchorMax = new Vector2(0.5f, 0.5f);
+        crosshairRect.pivot = new Vector2(0.5f, 0.5f);
+        crosshairRect.sizeDelta = new Vector2(40f, 40f);
+        crosshairRect.anchoredPosition = Vector2.zero;
+
+        hudRect = healthText.transform.parent as RectTransform;
+
+        CreateCrosshairPart("Top", new Vector2(0f, 9f), new Vector2(3f, 10f));
+        CreateCrosshairPart("Bottom", new Vector2(0f, -9f), new Vector2(3f, 10f));
+        CreateCrosshairPart("Left", new Vector2(-9f, 0f), new Vector2(10f, 3f));
+        CreateCrosshairPart("Right", new Vector2(9f, 0f), new Vector2(10f, 3f));
+        CreateCrosshairPart("Center", Vector2.zero, new Vector2(4f, 4f));
+
+        UpdateCrosshairVisible();
+    }
+
+    private void CreateCrosshairPart(string objectName, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject partObject = new GameObject(objectName, typeof(RectTransform));
+        partObject.transform.SetParent(crosshairRoot.transform, false);
+
+        RectTransform rectTransform = partObject.GetComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = size;
+        rectTransform.anchoredPosition = anchoredPosition;
+
+        Image image = partObject.AddComponent<Image>();
+        image.sprite = defaultUiSprite;
+        image.type = Image.Type.Simple;
+        image.color = new Color(1f, 0.95f, 0.55f, 0.95f);
+        image.raycastTarget = false;
+    }
+
+    private void UpdateCrosshairVisible()
+    {
+        if (crosshairRoot == null)
+        {
+            return;
+        }
+
+        bool isConnectionPanelVisible = connectionPanel != null && connectionPanel.activeSelf;
+        bool shouldShowCrosshair = !isConnectionPanelVisible && localIsAlive;
+        crosshairRoot.SetActive(shouldShowCrosshair);
+    }
+
+    private void UpdateCrosshairPosition()
+    {
+        if (crosshairRect == null || !crosshairRoot.activeSelf)
+        {
+            return;
+        }
+
+        if (localPlayerController == null)
+        {
+            localPlayerController = FindObjectOfType<SpaceshipController>();
+        }
+
+        if (targetCamera == null)
+        {
+            targetCamera = Camera.main;
+        }
+
+        if (localPlayerController == null || targetCamera == null || hudRect == null)
+        {
+            return;
+        }
+
+        Vector3 aimPoint = localPlayerController.GetLaserAimPoint(CrosshairDistance);
+        Vector3 screenPoint = targetCamera.WorldToScreenPoint(aimPoint);
+
+        if (screenPoint.z <= 0f)
+        {
+            return;
+        }
+
+        Vector2 localPoint;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(hudRect, screenPoint, null, out localPoint);
+        crosshairRect.anchoredPosition = localPoint;
+    }
+
     private void UpdateStatsText()
     {
         UpdateHealthBar();
@@ -419,5 +532,7 @@ public class GameUI : MonoBehaviour
         {
             connectionPanel.SetActive(isVisible);
         }
+
+        UpdateCrosshairVisible();
     }
 }
