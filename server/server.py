@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 import websockets
 
@@ -237,7 +238,7 @@ async def broadcast_world_loop():
 
 
 async def handle_client(websocket):
-    print("Client connected")
+    print(f"{datetime.now():%I:%M:%S %p} Client connected")
 
     try:
         async for raw_message in websocket:
@@ -252,7 +253,7 @@ async def handle_message(websocket, raw_message):
     try:
         message = json.loads(raw_message)
     except json.JSONDecodeError:
-        print("Invalid JSON ignored:", raw_message)
+        print("f{datetime.now():%I:%M:%S %p} Invalid JSON ignored:", raw_message)
         return
 
     message_type = message.get("type")
@@ -282,7 +283,7 @@ async def handle_join(websocket, message):
     await send_json(websocket, {"type": "welcome", "id": player.id})
     await broadcast(make_world_message())
 
-    print(player.name, "joined as", player.id)
+    print(player.name, "{datetime.now():%I:%M:%S %p} joined as", player.id)
 
 
 def handle_state(websocket, message):
@@ -419,7 +420,7 @@ async def remove_player(websocket):
     if player is None:
         return
 
-    print(player.name, "disconnected")
+    print(player.name, f"{datetime.now():%I:%M:%S %p} disconnected")
     await broadcast({"type": "disconnect", "id": player.id})
     await broadcast(make_world_message())
 
@@ -430,7 +431,7 @@ async def main():
     asyncio.create_task(broadcast_world_loop())
 
     async with websockets.serve(handle_client, HOST, PORT):
-        print("Server ready. Press Ctrl+C to stop.")
+        print(f"{datetime.now():%I:%M:%S %p} Server ready. Press Ctrl+C to stop.")
         await asyncio.Future()
 
 
@@ -438,4 +439,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nServer stopped")
+        print("\n {datetime.now():%I:%M:%S %p} Server stopped")
