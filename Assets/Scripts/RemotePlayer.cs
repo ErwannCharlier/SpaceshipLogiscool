@@ -251,7 +251,7 @@ public class RemotePlayer : MonoBehaviour
 
     private void UpdateNameLabelText()
     {
-        // TODO cours3 bonus: afficher le nom du joueur au-dessus du vaisseau distant.
+        // TODO cours3: afficher le nom du joueur au-dessus du vaisseau distant.
     }
 
     private void UpdateNameLabelTransform()
