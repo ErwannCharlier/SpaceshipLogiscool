@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NativeWebSocket;
 using UnityEngine;
 
 public class NetworkClient : MonoBehaviour
@@ -29,8 +28,7 @@ public class NetworkClient : MonoBehaviour
     public event Action<string> PlayerDisconnected;
     public event Action<HitMessage> HitReceived;
 
-    private ClientWebSocket socket;
-    private CancellationTokenSource cancellation;
+    private WebSocket socket;
     private readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1);
     private readonly ConcurrentQueue<string> receivedJson = new ConcurrentQueue<string>();
     private readonly ConcurrentQueue<Action> mainThreadActions = new ConcurrentQueue<Action>();
@@ -50,6 +48,10 @@ public class NetworkClient : MonoBehaviour
 
     private void Update()
     {
+#if !UNITY_WEBGL || UNITY_EDITOR
+        socket?.DispatchMessageQueue();
+#endif
+
         RunMainThreadActions();
         ReadReceivedMessages();
     }
@@ -157,6 +159,8 @@ public class NetworkClient : MonoBehaviour
     {
         await DisconnectAsync(false);
 
+        serverUrl = serverUrl.Trim();
+
         if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out Uri uri))
         {
             QueueStatus("Invalid server URL");
@@ -168,13 +172,43 @@ public class NetworkClient : MonoBehaviour
             IsConnecting = true;
             QueueStatus("Connecting...");
 
-            cancellation = new CancellationTokenSource();
-            socket = new ClientWebSocket();
-            await socket.ConnectAsync(uri, cancellation.Token);
+            Debug.Log("Connecting to [" + uri + "]");
+            Debug.Log("Platform = " + Application.platform);
 
-            IsConnecting = false;
-            QueueConnected();
-            _ = ReceiveLoop();
+            socket = new WebSocket(uri.ToString());
+
+            socket.OnOpen += () =>
+            {
+                Debug.Log("WebSocket opened");
+
+                IsConnecting = false;
+                QueueConnected();
+            };
+
+            socket.OnError += (error) =>
+            {
+                Debug.LogError("WebSocket error: " + error);
+
+                IsConnecting = false;
+                QueueStatus("Connection failed: " + error);
+                QueueDisconnected();
+            };
+
+            socket.OnClose += (code) =>
+            {
+                Debug.Log("WebSocket closed: " + code);
+
+                IsConnecting = false;
+                QueueDisconnected();
+            };
+
+            socket.OnMessage += (bytes) =>
+            {
+                string json = Encoding.UTF8.GetString(bytes);
+                receivedJson.Enqueue(json);
+            };
+
+            await socket.Connect();
         }
         catch (Exception exception)
         {
@@ -195,16 +229,15 @@ public class NetworkClient : MonoBehaviour
         try
         {
             IsConnecting = false;
-            cancellation?.Cancel();
 
-            if (socket != null && socket.State == WebSocketState.Open)
+            if (socket != null)
             {
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnecting", CancellationToken.None);
+                await socket.Close();
             }
         }
         catch
         {
-            // Closing can fail if the server already disappeared. The client can still clean up locally.
+            // Closing can fail if the server already disappeared.
         }
         finally
         {
@@ -221,11 +254,9 @@ public class NetworkClient : MonoBehaviour
     {
         if (!IsConnected)
         {
+            Debug.LogWarning("Cannot send because socket is not connected: " + json);
             return;
         }
-
-        byte[] bytes = Encoding.UTF8.GetBytes(json);
-        ArraySegment<byte> data = new ArraySegment<byte>(bytes);
 
         await sendLock.WaitAsync();
 
@@ -233,7 +264,7 @@ public class NetworkClient : MonoBehaviour
         {
             if (IsConnected)
             {
-                await socket.SendAsync(data, WebSocketMessageType.Text, true, cancellation.Token);
+                await socket.SendText(json);
             }
         }
         catch (Exception exception)
@@ -243,55 +274,6 @@ public class NetworkClient : MonoBehaviour
         finally
         {
             sendLock.Release();
-        }
-    }
-
-    private async Task ReceiveLoop()
-    {
-        byte[] buffer = new byte[4096];
-
-        try
-        {
-            // Messages may arrive in several chunks, so the loop rebuilds one full JSON string first.
-            while (socket != null && socket.State == WebSocketState.Open && !cancellation.IsCancellationRequested)
-            {
-                using (MemoryStream messageStream = new MemoryStream())
-                {
-                    WebSocketReceiveResult result;
-
-                    do
-                    {
-                        ArraySegment<byte> data = new ArraySegment<byte>(buffer);
-                        result = await socket.ReceiveAsync(data, cancellation.Token);
-
-                        if (result.MessageType == WebSocketMessageType.Close)
-                        {
-                            QueueStatus("Server closed the connection");
-                            QueueDisconnected();
-                            return;
-                        }
-
-                        messageStream.Write(buffer, 0, result.Count);
-                    }
-                    while (!result.EndOfMessage);
-
-                    string json = Encoding.UTF8.GetString(messageStream.ToArray());
-                    receivedJson.Enqueue(json);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Normal when the player presses Disconnect or exits Play mode.
-        }
-        catch (ObjectDisposedException)
-        {
-            // Normal if the socket is disposed while ReceiveAsync is waiting.
-        }
-        catch (Exception exception)
-        {
-            QueueStatus("Connection lost: " + exception.Message);
-            QueueDisconnected();
         }
     }
 
@@ -307,7 +289,6 @@ public class NetworkClient : MonoBehaviour
     {
         try
         {
-            // First read only the "type" field, then parse the same JSON into the right message class.
             MessageTypeOnly messageType = JsonUtility.FromJson<MessageTypeOnly>(json);
 
             switch (messageType.type)
@@ -394,10 +375,6 @@ public class NetworkClient : MonoBehaviour
 
     private void CleanupSocket()
     {
-        cancellation?.Dispose();
-        cancellation = null;
-
-        socket?.Dispose();
         socket = null;
     }
 }
