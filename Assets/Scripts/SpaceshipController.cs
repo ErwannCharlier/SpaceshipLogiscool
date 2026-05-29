@@ -199,37 +199,7 @@ public class SpaceshipController : MonoBehaviour
 
     public void SetSelectedShip(string shipId)
     {
-        string normalizedShipId = ShipLibrary.NormalizeShipId(shipId);
-
-        if (string.IsNullOrEmpty(normalizedShipId))
-        {
-            return;
-        }
-
-        if (currentShipVisualId == normalizedShipId && FindShipModel() != null)
-        {
-            return;
-        }
-
-        GameObject shipPrefab = ShipLibrary.GetShipPrefab(normalizedShipId);
-
-        if (shipPrefab == null)
-        {
-            return;
-        }
-
-        RemoveExistingShipModel();
-
-        GameObject shipModel = Instantiate(shipPrefab, transform);
-        shipModel.name = "ShipModel";
-        shipModel.transform.localPosition = shipModelLocalPosition;
-        shipModel.transform.localRotation = Quaternion.Euler(shipModelLocalEulerAngles);
-        shipModel.transform.localScale = shipModelLocalScale;
-
-        shipModelRoot = shipModel.transform;
-        currentShipVisualId = normalizedShipId;
-        RefreshShipRenderers();
-        SetShipVisible(isAlive);
+        // TODO cours3: charger le bon prefab de vaisseau, remplacer l'ancien modele et afficher le nouveau.
     }
 
     public void PlayExplosion()

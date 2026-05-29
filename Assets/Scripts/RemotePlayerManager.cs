@@ -135,26 +135,7 @@ public class RemotePlayerManager : MonoBehaviour
 
     private void ApplyShipVisual(RemotePlayer remotePlayer, string shipId)
     {
-        if (remotePlayer == null)
-        {
-            return;
-        }
-
-        GameObject shipPrefab = ShipLibrary.GetShipPrefab(shipId);
-
-        if (shipPrefab != null)
-        {
-            remotePlayer.SetShipVisual(shipId, shipPrefab, remoteModelLocalPosition, remoteModelLocalEulerAngles, remoteModelLocalScale);
-            return;
-        }
-
-        if (remoteShipPrefab != null)
-        {
-            remotePlayer.SetShipVisual("default", remoteShipPrefab, remoteModelLocalPosition, remoteModelLocalEulerAngles, remoteModelLocalScale);
-            return;
-        }
-
-        remotePlayer.EnsureFallbackVisual();
+        // TODO cours3: choisir le bon modele pour un joueur distant et appliquer un fallback si besoin.
     }
 
     private void HandleShootEvent(ShootEventMessage shootEvent)

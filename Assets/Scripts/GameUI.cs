@@ -594,24 +594,7 @@ public class GameUI : MonoBehaviour
 
     private void CycleShipSelection(int direction)
     {
-        int shipCount = ShipLibrary.GetShipCount();
-
-        if (shipCount == 0)
-        {
-            return;
-        }
-
-        int shipIndex = ShipLibrary.GetShipIndex(pendingShipId);
-
-        if (shipIndex < 0)
-        {
-            shipIndex = 0;
-        }
-
-        shipIndex = (shipIndex + direction + shipCount) % shipCount;
-        pendingShipId = ShipLibrary.GetShipIdAt(shipIndex);
-        ApplyPendingShipSelection();
-        UpdateShipSelectorText();
+        // TODO cours3: changer le vaisseau selectionne, appliquer le nouveau modele local et mettre a jour le texte du menu.
     }
 
     private void UpdateShipSelectorText()
@@ -801,49 +784,7 @@ public class GameUI : MonoBehaviour
 
     private void UpdateRadarPlayerBlips()
     {
-        if (latestWorldPlayers == null || networkClient == null)
-        {
-            ClearRadarPlayerBlips();
-            return;
-        }
-
-        radarPlayerIdsToRemove.Clear();
-
-        foreach (string playerId in radarPlayerBlips.Keys)
-        {
-            radarPlayerIdsToRemove.Add(playerId);
-        }
-
-        for (int i = 0; i < latestWorldPlayers.Length; i++)
-        {
-            NetworkPlayerInfo player = latestWorldPlayers[i];
-
-            if (player == null || string.IsNullOrEmpty(player.id) || player.id == networkClient.LocalPlayerId)
-            {
-                continue;
-            }
-
-            Image blip = GetOrCreateRadarPlayerBlip(player.id);
-            Vector2 radarPoint = WorldToRadarPosition(new Vector3(player.x, player.y, player.z));
-            blip.rectTransform.anchoredPosition = radarPoint;
-            blip.color = player.isAlive
-                ? new Color(1f, 0.46f, 0.24f, 1f)
-                : new Color(0.62f, 0.62f, 0.62f, 0.75f);
-
-            radarPlayerIdsToRemove.Remove(player.id);
-        }
-
-        for (int i = 0; i < radarPlayerIdsToRemove.Count; i++)
-        {
-            string playerId = radarPlayerIdsToRemove[i];
-
-            if (radarPlayerBlips.TryGetValue(playerId, out Image blip) && blip != null)
-            {
-                Destroy(blip.gameObject);
-            }
-
-            radarPlayerBlips.Remove(playerId);
-        }
+        // TODO cours3: afficher un point pour chaque autre joueur sur le radar et supprimer ceux qui ont disparu.
     }
 
     private Image GetOrCreateRadarPlayerBlip(string playerId)
@@ -873,51 +814,8 @@ public class GameUI : MonoBehaviour
 
     private Vector2 WorldToRadarPosition(Vector3 worldPosition)
     {
-        if (localPlayerController == null)
-        {
-            localPlayerController = FindFirstObjectByType<SpaceshipController>();
-        }
-
-        if (localPlayerController == null)
-        {
-            return Vector2.zero;
-        }
-
-        Transform playerTransform = localPlayerController.transform;
-        Vector3 playerPosition = playerTransform.position;
-        Vector3 flatForward = playerTransform.forward;
-        flatForward.y = 0f;
-
-        if (flatForward.sqrMagnitude < 0.001f)
-        {
-            flatForward = Vector3.forward;
-        }
-
-        flatForward.Normalize();
-
-        Vector3 flatRight = playerTransform.right;
-        flatRight.y = 0f;
-
-        if (flatRight.sqrMagnitude < 0.001f)
-        {
-            flatRight = Vector3.right;
-        }
-
-        flatRight.Normalize();
-
-        Vector3 delta = worldPosition - playerPosition;
-        delta.y = 0f;
-
-        float radarX = Vector3.Dot(delta, flatRight);
-        float radarY = Vector3.Dot(delta, flatForward);
-        Vector2 radarPoint = new Vector2(radarX, radarY) / RadarWorldRange * RadarRadius;
-
-        if (radarPoint.magnitude > RadarRadius)
-        {
-            radarPoint = radarPoint.normalized * RadarRadius;
-        }
-
-        return radarPoint;
+        // TODO cours3: convertir une position du monde en position 2D sur le radar autour du joueur local.
+        return Vector2.zero;
     }
 
     private Button CreateMenuButton(string objectName, RectTransform parent, Text template, Vector2 anchoredPosition, string label)

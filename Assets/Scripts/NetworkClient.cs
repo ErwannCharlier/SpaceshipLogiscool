@@ -82,14 +82,7 @@ public class NetworkClient : MonoBehaviour
 
     public void SendJoin(string playerName, string shipId)
     {
-        JoinMessage message = new JoinMessage
-        {
-            type = "join",
-            name = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim(),
-            shipId = string.IsNullOrWhiteSpace(shipId) ? ShipLibrary.GetDefaultShipId() : ShipLibrary.NormalizeShipId(shipId)
-        };
-
-        SendJson(JsonUtility.ToJson(message));
+        // TODO cours3: creer le message join avec le nom du joueur et le shipId choisi, puis l'envoyer en JSON.
     }
 
     public void SendPlayerState(Vector3 position, float yaw)
