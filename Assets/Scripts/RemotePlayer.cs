@@ -251,12 +251,7 @@ public class RemotePlayer : MonoBehaviour
 
     private void UpdateNameLabelText()
     {
-        if (nameLabelText == null)
-        {
-            return;
-        }
-
-        nameLabelText.text = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName;
+        // TODO cours3 bonus: afficher le nom du joueur au-dessus du vaisseau distant.
     }
 
     private void UpdateNameLabelTransform()

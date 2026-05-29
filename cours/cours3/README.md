@@ -263,6 +263,39 @@ Checkpoint :
 - les points bougent quand les joueurs bougent
 - les joueurs morts peuvent avoir une couleur differente
 
+## Bonus - Afficher le nom au-dessus des joueurs
+
+Fichier :
+
+```text
+Assets/Scripts/RemotePlayer.cs
+```
+
+Tu peux completer :
+
+- `UpdateNameLabelText()`
+
+### Objectif
+
+Quand un joueur distant apparait, son pseudo doit etre visible au-dessus de son vaisseau.
+
+Le `TextMesh` existe deja. Ton travail ici est simple :
+
+1. verifier que `nameLabelText` existe
+2. afficher `"Player"` si le nom est vide
+3. sinon afficher `playerName`
+
+Indice :
+
+```csharp
+string.IsNullOrWhiteSpace(playerName)
+```
+
+Checkpoint bonus :
+
+- les autres joueurs ont un nom au-dessus du vaisseau
+- si le nom est vide, le texte affiche `Player`
+
 ## Test final
 
 A la fin, tu dois pouvoir :
@@ -274,5 +307,9 @@ A la fin, tu dois pouvoir :
 - envoyer `shipId` au serveur
 - voir les autres joueurs sur le radar
 - voir le bon vaisseau chez un autre joueur si le serveur renvoie bien `shipId`
+
+Bonus :
+
+- voir le nom des autres joueurs au-dessus de leur vaisseau
 
 Si tout ca marche, ton cours 3 est reussi.
