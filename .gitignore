@@ -75,3 +75,11 @@ Thumbs.db
 Desktop.ini
 
 *.app/
+
+
+!web/
+!web/Build/
+!web/Build/**
+!web/TemplateData/
+!web/TemplateData/**
+!web/index.html
