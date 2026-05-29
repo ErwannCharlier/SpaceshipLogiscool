@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -20,13 +21,18 @@ public class GameUI : MonoBehaviour
 
     private const float MaxStatValue = 100f;
     private const float CrosshairDistance = 80f;
+    private const float RadarWorldRange = 80f;
+    private const float RadarRadius = 58f;
+    private const float RadarSweepSpeed = 90f;
 
     private string pendingPlayerName = "Player";
+    private string pendingShipId = string.Empty;
     private float localHealth = MaxStatValue;
     private float localEnergy = MaxStatValue;
     private int localScore = 0;
     private bool localIsAlive = true;
     private float localRespawnSeconds = 0f;
+    private NetworkPlayerInfo[] latestWorldPlayers;
 
     private Image healthBarFill;
     private Image energyBarFill;
@@ -34,21 +40,30 @@ public class GameUI : MonoBehaviour
     private Text energyLabelText;
     private Text energyValueText;
     private Text respawnText;
+    private Text shipSelectorValueText;
+    private Button shipPreviousButton;
+    private Button shipNextButton;
     private GameObject crosshairRoot;
+    private GameObject radarRoot;
     private RectTransform crosshairRect;
     private RectTransform hudRect;
+    private RectTransform radarContentRect;
+    private RectTransform radarSweepRect;
     private Camera targetCamera;
     private SpaceshipController localPlayerController;
+    private Image radarStationBlip;
     private static Sprite defaultUiSprite;
+    private readonly Dictionary<string, Image> radarPlayerBlips = new Dictionary<string, Image>();
+    private readonly List<string> radarPlayerIdsToRemove = new List<string>();
 
     private void Awake()
     {
         if (networkClient == null)
         {
-            networkClient = FindObjectOfType<NetworkClient>();
+            networkClient = FindFirstObjectByType<NetworkClient>();
         }
 
-        localPlayerController = FindObjectOfType<SpaceshipController>();
+        localPlayerController = FindFirstObjectByType<SpaceshipController>();
         targetCamera = Camera.main;
 
         if (defaultUiSprite == null)
@@ -57,6 +72,8 @@ public class GameUI : MonoBehaviour
         }
 
         CreateHudIfNeeded();
+        CreateShipSelectorIfNeeded();
+        InitializeShipSelection();
     }
 
     private void OnEnable()
@@ -89,6 +106,8 @@ public class GameUI : MonoBehaviour
         }
 
         CreateHudIfNeeded();
+        CreateShipSelectorIfNeeded();
+        InitializeShipSelection();
         HandleStatusChanged(networkClient != null ? networkClient.LastStatus : "No NetworkClient");
         UpdateStatsText();
         UpdateButtons();
@@ -119,6 +138,7 @@ public class GameUI : MonoBehaviour
     private void Update()
     {
         UpdateCrosshairPosition();
+        UpdateRadar();
     }
 
     private void ConnectButtonClicked()
@@ -142,7 +162,7 @@ public class GameUI : MonoBehaviour
 
         if (networkClient.IsConnected)
         {
-            networkClient.SendJoin(pendingPlayerName);
+            networkClient.SendJoin(pendingPlayerName, pendingShipId);
         }
         else
         {
@@ -164,9 +184,10 @@ public class GameUI : MonoBehaviour
 
     private void HandleConnected()
     {
-        networkClient.SendJoin(pendingPlayerName);
+        networkClient.SendJoin(pendingPlayerName, pendingShipId);
         SetConnectionPanelVisible(false);
         UpdateCrosshairVisible();
+        UpdateRadarVisible();
         UpdateButtons();
     }
 
@@ -174,9 +195,12 @@ public class GameUI : MonoBehaviour
     {
         localRespawnSeconds = 0f;
         localIsAlive = true;
+        latestWorldPlayers = null;
         SetConnectionPanelVisible(true);
         UpdateRespawnText();
         UpdateCrosshairVisible();
+        ClearRadarPlayerBlips();
+        UpdateRadarVisible();
         UpdateButtons();
     }
 
@@ -197,6 +221,8 @@ public class GameUI : MonoBehaviour
             return;
         }
 
+        latestWorldPlayers = players;
+
         for (int i = 0; i < players.Length; i++)
         {
             NetworkPlayerInfo player = players[i];
@@ -208,8 +234,16 @@ public class GameUI : MonoBehaviour
                 localScore = player.score;
                 localIsAlive = player.isAlive;
                 localRespawnSeconds = player.respawnSeconds;
+
+                if (!string.IsNullOrWhiteSpace(player.shipId))
+                {
+                    pendingShipId = ShipLibrary.NormalizeShipId(player.shipId);
+                    UpdateShipSelectorText();
+                }
+
                 UpdateStatsText();
                 UpdateCrosshairVisible();
+                UpdateRadarVisible();
                 return;
             }
         }
@@ -251,6 +285,7 @@ public class GameUI : MonoBehaviour
         respawnText.gameObject.SetActive(false);
 
         CreateCrosshairIfNeeded();
+        CreateRadarIfNeeded();
     }
 
     private void ConfigureLabel(Text label, string value)
@@ -426,7 +461,7 @@ public class GameUI : MonoBehaviour
 
         if (localPlayerController == null)
         {
-            localPlayerController = FindObjectOfType<SpaceshipController>();
+            localPlayerController = FindFirstObjectByType<SpaceshipController>();
         }
 
         if (targetCamera == null)
@@ -450,6 +485,492 @@ public class GameUI : MonoBehaviour
         Vector2 localPoint;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(hudRect, screenPoint, null, out localPoint);
         crosshairRect.anchoredPosition = localPoint;
+    }
+
+    private void InitializeShipSelection()
+    {
+        if (!ShipLibrary.HasShips())
+        {
+            UpdateShipSelectorText();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(pendingShipId))
+        {
+            pendingShipId = ShipLibrary.GetDefaultShipId();
+        }
+
+        ApplyPendingShipSelection();
+        UpdateShipSelectorText();
+    }
+
+    private void ApplyPendingShipSelection()
+    {
+        if (localPlayerController == null)
+        {
+            localPlayerController = FindFirstObjectByType<SpaceshipController>();
+        }
+
+        if (localPlayerController != null && !string.IsNullOrWhiteSpace(pendingShipId))
+        {
+            localPlayerController.SetSelectedShip(pendingShipId);
+        }
+    }
+
+    private void CreateShipSelectorIfNeeded()
+    {
+        if (connectionPanel == null || shipSelectorValueText != null)
+        {
+            return;
+        }
+
+        Text template = statusText != null ? statusText : healthText;
+
+        if (template == null)
+        {
+            return;
+        }
+
+        GameObject rowObject = new GameObject("Ship Selector", typeof(RectTransform));
+        rowObject.transform.SetParent(connectionPanel.transform, false);
+
+        RectTransform rowRect = rowObject.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0.5f, 0.5f);
+        rowRect.anchorMax = new Vector2(0.5f, 0.5f);
+        rowRect.pivot = new Vector2(0.5f, 0.5f);
+        rowRect.sizeDelta = new Vector2(310f, 40f);
+        rowRect.anchoredPosition = GetShipSelectorPosition();
+
+        Text label = CreateTextElement("Ship Label", rowRect, template, new Vector2(-112f, 0f), new Vector2(105f, 30f), "Vaisseau");
+        label.alignment = TextAnchor.MiddleLeft;
+
+        shipPreviousButton = CreateMenuButton("Ship Previous", rowRect, template, new Vector2(-28f, 0f), "<");
+        shipNextButton = CreateMenuButton("Ship Next", rowRect, template, new Vector2(117f, 0f), ">");
+        shipSelectorValueText = CreateTextElement("Ship Value", rowRect, template, new Vector2(45f, 0f), new Vector2(125f, 30f), "Vaisseau 1");
+        shipSelectorValueText.alignment = TextAnchor.MiddleCenter;
+
+        if (shipPreviousButton != null)
+        {
+            shipPreviousButton.onClick.AddListener(SelectPreviousShip);
+        }
+
+        if (shipNextButton != null)
+        {
+            shipNextButton.onClick.AddListener(SelectNextShip);
+        }
+    }
+
+    private Vector2 GetShipSelectorPosition()
+    {
+        RectTransform playerNameRect = playerNameInput != null ? playerNameInput.transform as RectTransform : null;
+
+        if (playerNameRect != null && connectButton != null)
+        {
+            RectTransform connectRect = connectButton.transform as RectTransform;
+
+            if (connectRect != null)
+            {
+                return (playerNameRect.anchoredPosition + connectRect.anchoredPosition) * 0.5f + new Vector2(0f, 8f);
+            }
+        }
+
+        if (playerNameRect != null)
+        {
+            return playerNameRect.anchoredPosition + new Vector2(0f, -50f);
+        }
+
+        return new Vector2(0f, -20f);
+    }
+
+    private void SelectPreviousShip()
+    {
+        CycleShipSelection(-1);
+    }
+
+    private void SelectNextShip()
+    {
+        CycleShipSelection(1);
+    }
+
+    private void CycleShipSelection(int direction)
+    {
+        int shipCount = ShipLibrary.GetShipCount();
+
+        if (shipCount == 0)
+        {
+            return;
+        }
+
+        int shipIndex = ShipLibrary.GetShipIndex(pendingShipId);
+
+        if (shipIndex < 0)
+        {
+            shipIndex = 0;
+        }
+
+        shipIndex = (shipIndex + direction + shipCount) % shipCount;
+        pendingShipId = ShipLibrary.GetShipIdAt(shipIndex);
+        ApplyPendingShipSelection();
+        UpdateShipSelectorText();
+    }
+
+    private void UpdateShipSelectorText()
+    {
+        if (shipSelectorValueText == null)
+        {
+            return;
+        }
+
+        int shipCount = ShipLibrary.GetShipCount();
+
+        if (shipCount == 0)
+        {
+            shipSelectorValueText.text = "Aucun modele";
+        }
+        else
+        {
+            shipSelectorValueText.text = ShipLibrary.GetDisplayName(pendingShipId);
+        }
+
+        if (shipPreviousButton != null)
+        {
+            shipPreviousButton.interactable = shipCount > 1;
+        }
+
+        if (shipNextButton != null)
+        {
+            shipNextButton.interactable = shipCount > 1;
+        }
+    }
+
+    private void CreateRadarIfNeeded()
+    {
+        if (healthText == null || radarRoot != null)
+        {
+            return;
+        }
+
+        radarRoot = new GameObject("Radar", typeof(RectTransform));
+        radarRoot.transform.SetParent(healthText.transform.parent, false);
+
+        RectTransform radarRect = radarRoot.GetComponent<RectTransform>();
+        radarRect.anchorMin = new Vector2(1f, 1f);
+        radarRect.anchorMax = new Vector2(1f, 1f);
+        radarRect.pivot = new Vector2(1f, 1f);
+        radarRect.sizeDelta = new Vector2(170f, 190f);
+        radarRect.anchoredPosition = new Vector2(-18f, -18f);
+
+        Image radarBackground = radarRoot.AddComponent<Image>();
+        radarBackground.sprite = defaultUiSprite;
+        radarBackground.type = Image.Type.Simple;
+        radarBackground.color = new Color(0.04f, 0.08f, 0.11f, 0.82f);
+
+        Text radarLabel = CreateTextElement("Radar Label", radarRect, healthText, new Vector2(0f, -16f), new Vector2(150f, 24f), "RADAR");
+        radarLabel.alignment = TextAnchor.MiddleCenter;
+        radarLabel.color = new Color(0.72f, 0.95f, 1f, 1f);
+
+        GameObject radarContentObject = new GameObject("Radar Content", typeof(RectTransform));
+        radarContentObject.transform.SetParent(radarRoot.transform, false);
+        radarContentRect = radarContentObject.GetComponent<RectTransform>();
+        radarContentRect.anchorMin = new Vector2(0.5f, 0.5f);
+        radarContentRect.anchorMax = new Vector2(0.5f, 0.5f);
+        radarContentRect.pivot = new Vector2(0.5f, 0.5f);
+        radarContentRect.sizeDelta = new Vector2(132f, 132f);
+        radarContentRect.anchoredPosition = new Vector2(0f, -14f);
+
+        Image radarContentBackground = radarContentObject.AddComponent<Image>();
+        radarContentBackground.sprite = defaultUiSprite;
+        radarContentBackground.type = Image.Type.Simple;
+        radarContentBackground.color = new Color(0.02f, 0.16f, 0.15f, 0.86f);
+
+        CreateRadarLine("Radar Horizontal", new Vector2(0f, 0f), new Vector2(118f, 2f), new Color(0.18f, 0.55f, 0.52f, 0.45f));
+        CreateRadarLine("Radar Vertical", new Vector2(0f, 0f), new Vector2(2f, 118f), new Color(0.18f, 0.55f, 0.52f, 0.45f));
+        CreateRadarLine("Radar Top", new Vector2(0f, 58f), new Vector2(118f, 2f), new Color(0.12f, 0.32f, 0.32f, 0.3f));
+        CreateRadarLine("Radar Bottom", new Vector2(0f, -58f), new Vector2(118f, 2f), new Color(0.12f, 0.32f, 0.32f, 0.3f));
+        CreateRadarLine("Radar Left", new Vector2(-58f, 0f), new Vector2(2f, 118f), new Color(0.12f, 0.32f, 0.32f, 0.3f));
+        CreateRadarLine("Radar Right", new Vector2(58f, 0f), new Vector2(2f, 118f), new Color(0.12f, 0.32f, 0.32f, 0.3f));
+
+        CreateRadarBlip("Local Blip", Color.green, new Vector2(8f, 8f), Vector2.zero, radarContentRect);
+        radarStationBlip = CreateRadarBlip("Station Blip", new Color(0.22f, 0.78f, 1f, 1f), new Vector2(10f, 10f), Vector2.zero, radarContentRect);
+
+        GameObject sweepObject = new GameObject("Radar Sweep", typeof(RectTransform));
+        sweepObject.transform.SetParent(radarContentRect, false);
+        radarSweepRect = sweepObject.GetComponent<RectTransform>();
+        radarSweepRect.anchorMin = new Vector2(0.5f, 0.5f);
+        radarSweepRect.anchorMax = new Vector2(0.5f, 0.5f);
+        radarSweepRect.pivot = new Vector2(0.5f, 0f);
+        radarSweepRect.sizeDelta = new Vector2(2f, RadarRadius);
+        radarSweepRect.anchoredPosition = Vector2.zero;
+
+        Image sweepImage = sweepObject.AddComponent<Image>();
+        sweepImage.sprite = defaultUiSprite;
+        sweepImage.type = Image.Type.Simple;
+        sweepImage.color = new Color(0.48f, 1f, 0.76f, 0.45f);
+
+        UpdateRadarVisible();
+    }
+
+    private void CreateRadarLine(string objectName, Vector2 anchoredPosition, Vector2 size, Color color)
+    {
+        GameObject lineObject = new GameObject(objectName, typeof(RectTransform));
+        lineObject.transform.SetParent(radarContentRect, false);
+
+        RectTransform rectTransform = lineObject.GetComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = size;
+        rectTransform.anchoredPosition = anchoredPosition;
+
+        Image image = lineObject.AddComponent<Image>();
+        image.sprite = defaultUiSprite;
+        image.type = Image.Type.Simple;
+        image.color = color;
+        image.raycastTarget = false;
+    }
+
+    private Image CreateRadarBlip(string objectName, Color color, Vector2 size, Vector2 anchoredPosition, Transform parent)
+    {
+        GameObject blipObject = new GameObject(objectName, typeof(RectTransform));
+        blipObject.transform.SetParent(parent, false);
+
+        RectTransform rectTransform = blipObject.GetComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = size;
+        rectTransform.anchoredPosition = anchoredPosition;
+
+        Image image = blipObject.AddComponent<Image>();
+        image.sprite = defaultUiSprite;
+        image.type = Image.Type.Simple;
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private void UpdateRadarVisible()
+    {
+        if (radarRoot == null)
+        {
+            return;
+        }
+
+        bool isConnectionPanelVisible = connectionPanel != null && connectionPanel.activeSelf;
+        bool shouldShowRadar = !isConnectionPanelVisible && networkClient != null && networkClient.IsConnected;
+        radarRoot.SetActive(shouldShowRadar);
+    }
+
+    private void UpdateRadar()
+    {
+        UpdateRadarVisible();
+
+        if (radarRoot == null || !radarRoot.activeSelf)
+        {
+            return;
+        }
+
+        if (radarSweepRect != null)
+        {
+            radarSweepRect.localRotation = Quaternion.Euler(0f, 0f, -Time.time * RadarSweepSpeed);
+        }
+
+        UpdateRadarStationBlip();
+        UpdateRadarPlayerBlips();
+    }
+
+    private void UpdateRadarStationBlip()
+    {
+        if (radarStationBlip == null)
+        {
+            return;
+        }
+
+        if (networkClient == null || networkClient.CurrentStation == null)
+        {
+            radarStationBlip.gameObject.SetActive(false);
+            return;
+        }
+
+        radarStationBlip.gameObject.SetActive(true);
+        Vector2 radarPoint = WorldToRadarPosition(
+            new Vector3(networkClient.CurrentStation.x, networkClient.CurrentStation.y, networkClient.CurrentStation.z)
+        );
+        radarStationBlip.rectTransform.anchoredPosition = radarPoint;
+    }
+
+    private void UpdateRadarPlayerBlips()
+    {
+        if (latestWorldPlayers == null || networkClient == null)
+        {
+            ClearRadarPlayerBlips();
+            return;
+        }
+
+        radarPlayerIdsToRemove.Clear();
+
+        foreach (string playerId in radarPlayerBlips.Keys)
+        {
+            radarPlayerIdsToRemove.Add(playerId);
+        }
+
+        for (int i = 0; i < latestWorldPlayers.Length; i++)
+        {
+            NetworkPlayerInfo player = latestWorldPlayers[i];
+
+            if (player == null || string.IsNullOrEmpty(player.id) || player.id == networkClient.LocalPlayerId)
+            {
+                continue;
+            }
+
+            Image blip = GetOrCreateRadarPlayerBlip(player.id);
+            Vector2 radarPoint = WorldToRadarPosition(new Vector3(player.x, player.y, player.z));
+            blip.rectTransform.anchoredPosition = radarPoint;
+            blip.color = player.isAlive
+                ? new Color(1f, 0.46f, 0.24f, 1f)
+                : new Color(0.62f, 0.62f, 0.62f, 0.75f);
+
+            radarPlayerIdsToRemove.Remove(player.id);
+        }
+
+        for (int i = 0; i < radarPlayerIdsToRemove.Count; i++)
+        {
+            string playerId = radarPlayerIdsToRemove[i];
+
+            if (radarPlayerBlips.TryGetValue(playerId, out Image blip) && blip != null)
+            {
+                Destroy(blip.gameObject);
+            }
+
+            radarPlayerBlips.Remove(playerId);
+        }
+    }
+
+    private Image GetOrCreateRadarPlayerBlip(string playerId)
+    {
+        if (radarPlayerBlips.TryGetValue(playerId, out Image blip) && blip != null)
+        {
+            return blip;
+        }
+
+        blip = CreateRadarBlip("Radar Player " + playerId, new Color(1f, 0.46f, 0.24f, 1f), new Vector2(8f, 8f), Vector2.zero, radarContentRect);
+        radarPlayerBlips[playerId] = blip;
+        return blip;
+    }
+
+    private void ClearRadarPlayerBlips()
+    {
+        foreach (Image blip in radarPlayerBlips.Values)
+        {
+            if (blip != null)
+            {
+                Destroy(blip.gameObject);
+            }
+        }
+
+        radarPlayerBlips.Clear();
+    }
+
+    private Vector2 WorldToRadarPosition(Vector3 worldPosition)
+    {
+        if (localPlayerController == null)
+        {
+            localPlayerController = FindFirstObjectByType<SpaceshipController>();
+        }
+
+        if (localPlayerController == null)
+        {
+            return Vector2.zero;
+        }
+
+        Transform playerTransform = localPlayerController.transform;
+        Vector3 playerPosition = playerTransform.position;
+        Vector3 flatForward = playerTransform.forward;
+        flatForward.y = 0f;
+
+        if (flatForward.sqrMagnitude < 0.001f)
+        {
+            flatForward = Vector3.forward;
+        }
+
+        flatForward.Normalize();
+
+        Vector3 flatRight = playerTransform.right;
+        flatRight.y = 0f;
+
+        if (flatRight.sqrMagnitude < 0.001f)
+        {
+            flatRight = Vector3.right;
+        }
+
+        flatRight.Normalize();
+
+        Vector3 delta = worldPosition - playerPosition;
+        delta.y = 0f;
+
+        float radarX = Vector3.Dot(delta, flatRight);
+        float radarY = Vector3.Dot(delta, flatForward);
+        Vector2 radarPoint = new Vector2(radarX, radarY) / RadarWorldRange * RadarRadius;
+
+        if (radarPoint.magnitude > RadarRadius)
+        {
+            radarPoint = radarPoint.normalized * RadarRadius;
+        }
+
+        return radarPoint;
+    }
+
+    private Button CreateMenuButton(string objectName, RectTransform parent, Text template, Vector2 anchoredPosition, string label)
+    {
+        GameObject buttonObject = new GameObject(objectName, typeof(RectTransform));
+        buttonObject.transform.SetParent(parent, false);
+
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+        buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+        buttonRect.pivot = new Vector2(0.5f, 0.5f);
+        buttonRect.sizeDelta = new Vector2(32f, 32f);
+        buttonRect.anchoredPosition = anchoredPosition;
+
+        Image background = buttonObject.AddComponent<Image>();
+        background.sprite = defaultUiSprite;
+        background.type = Image.Type.Simple;
+        background.color = new Color(0.12f, 0.18f, 0.24f, 0.95f);
+
+        Button button = buttonObject.AddComponent<Button>();
+        button.targetGraphic = background;
+
+        Text labelText = CreateTextElement("Label", buttonRect, template, Vector2.zero, buttonRect.sizeDelta, label);
+        labelText.alignment = TextAnchor.MiddleCenter;
+        labelText.color = Color.white;
+
+        return button;
+    }
+
+    private Text CreateTextElement(
+        string objectName,
+        RectTransform parent,
+        Text template,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        string value
+    )
+    {
+        GameObject textObject = new GameObject(objectName, typeof(RectTransform));
+        textObject.transform.SetParent(parent, false);
+
+        RectTransform rectTransform = textObject.GetComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = size;
+        rectTransform.anchoredPosition = anchoredPosition;
+
+        Text text = textObject.AddComponent<Text>();
+        CopyTextStyle(template, text);
+        text.text = value;
+        text.raycastTarget = false;
+        return text;
     }
 
     private void UpdateStatsText()
@@ -534,5 +1055,6 @@ public class GameUI : MonoBehaviour
         }
 
         UpdateCrosshairVisible();
+        UpdateRadarVisible();
     }
 }

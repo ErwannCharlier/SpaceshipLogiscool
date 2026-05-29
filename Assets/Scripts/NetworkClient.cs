@@ -77,10 +77,16 @@ public class NetworkClient : MonoBehaviour
 
     public void SendJoin(string playerName)
     {
+        SendJoin(playerName, string.Empty);
+    }
+
+    public void SendJoin(string playerName, string shipId)
+    {
         JoinMessage message = new JoinMessage
         {
             type = "join",
-            name = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim()
+            name = string.IsNullOrWhiteSpace(playerName) ? "Player" : playerName.Trim(),
+            shipId = string.IsNullOrWhiteSpace(shipId) ? ShipLibrary.GetDefaultShipId() : ShipLibrary.NormalizeShipId(shipId)
         };
 
         SendJson(JsonUtility.ToJson(message));
@@ -407,6 +413,7 @@ public class JoinMessage
 {
     public string type;
     public string name;
+    public string shipId;
 }
 
 [Serializable]
@@ -453,6 +460,7 @@ public class NetworkPlayerInfo
 {
     public string id;
     public string name;
+    public string shipId;
     public float x;
     public float y;
     public float z;

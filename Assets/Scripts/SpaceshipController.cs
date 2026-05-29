@@ -31,6 +31,11 @@ public class SpaceshipController : MonoBehaviour
     [Header("Effects")]
     public GameObject explosionPrefab;
 
+    [Header("Ship Model")]
+    public Vector3 shipModelLocalPosition = Vector3.zero;
+    public Vector3 shipModelLocalEulerAngles = new Vector3(-90f, 0f, 0f);
+    public Vector3 shipModelLocalScale = new Vector3(100f, 100f, 100f);
+
     [Header("Networking")]
     public NetworkClient networkClient;
     public float stateMessagesPerSecond = 10f;
@@ -44,15 +49,17 @@ public class SpaceshipController : MonoBehaviour
     private bool isAlive = true;
     private bool hasLocalWorldState;
     private Renderer[] shipRenderers;
+    private Transform shipModelRoot;
+    private string currentShipVisualId;
 
     private void Awake()
     {
         if (networkClient == null)
         {
-            networkClient = FindObjectOfType<NetworkClient>();
+            networkClient = FindFirstObjectByType<NetworkClient>();
         }
 
-        shipRenderers = GetComponentsInChildren<Renderer>(true);
+        RefreshShipRenderers();
     }
 
     private void OnEnable()
@@ -66,6 +73,11 @@ public class SpaceshipController : MonoBehaviour
 
     private void Start()
     {
+        if (ShipLibrary.HasShips())
+        {
+            SetSelectedShip(ShipLibrary.GetDefaultShipId());
+        }
+
         yaw = transform.eulerAngles.y;
         pitch = 0f;
         roll = 0f;
@@ -134,6 +146,11 @@ public class SpaceshipController : MonoBehaviour
         bool wasAlive = isAlive;
         isAlive = playerInfo.isAlive;
 
+        if (!string.IsNullOrWhiteSpace(playerInfo.shipId))
+        {
+            SetSelectedShip(playerInfo.shipId);
+        }
+
         if (!hasLocalWorldState)
         {
             ApplyServerTransform(playerInfo);
@@ -178,6 +195,41 @@ public class SpaceshipController : MonoBehaviour
                 shipRenderers[i].enabled = isVisible;
             }
         }
+    }
+
+    public void SetSelectedShip(string shipId)
+    {
+        string normalizedShipId = ShipLibrary.NormalizeShipId(shipId);
+
+        if (string.IsNullOrEmpty(normalizedShipId))
+        {
+            return;
+        }
+
+        if (currentShipVisualId == normalizedShipId && FindShipModel() != null)
+        {
+            return;
+        }
+
+        GameObject shipPrefab = ShipLibrary.GetShipPrefab(normalizedShipId);
+
+        if (shipPrefab == null)
+        {
+            return;
+        }
+
+        RemoveExistingShipModel();
+
+        GameObject shipModel = Instantiate(shipPrefab, transform);
+        shipModel.name = "ShipModel";
+        shipModel.transform.localPosition = shipModelLocalPosition;
+        shipModel.transform.localRotation = Quaternion.Euler(shipModelLocalEulerAngles);
+        shipModel.transform.localScale = shipModelLocalScale;
+
+        shipModelRoot = shipModel.transform;
+        currentShipVisualId = normalizedShipId;
+        RefreshShipRenderers();
+        SetShipVisible(isAlive);
     }
 
     public void PlayExplosion()
@@ -403,5 +455,53 @@ public class SpaceshipController : MonoBehaviour
     private bool IsPointerOverUI()
     {
         return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    }
+
+    private void RefreshShipRenderers()
+    {
+        shipRenderers = GetComponentsInChildren<Renderer>(true);
+    }
+
+    private void RemoveExistingShipModel()
+    {
+        Transform existingShipModel = FindShipModel();
+
+        if (existingShipModel == null)
+        {
+            currentShipVisualId = string.Empty;
+            return;
+        }
+
+        existingShipModel.gameObject.SetActive(false);
+
+        if (Application.isPlaying)
+        {
+            Destroy(existingShipModel.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(existingShipModel.gameObject);
+        }
+
+        shipModelRoot = null;
+        currentShipVisualId = string.Empty;
+        RefreshShipRenderers();
+    }
+
+    private Transform FindShipModel()
+    {
+        if (shipModelRoot != null)
+        {
+            return shipModelRoot;
+        }
+
+        Transform existingShipModel = transform.Find("ShipModel");
+
+        if (existingShipModel != null)
+        {
+            shipModelRoot = existingShipModel;
+        }
+
+        return shipModelRoot;
     }
 }

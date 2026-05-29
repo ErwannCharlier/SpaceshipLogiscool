@@ -21,7 +21,7 @@ public class RemotePlayerManager : MonoBehaviour
     {
         if (networkClient == null)
         {
-            networkClient = FindObjectOfType<NetworkClient>();
+            networkClient = FindFirstObjectByType<NetworkClient>();
         }
 
         if (remotePlayersParent == null)
@@ -101,6 +101,7 @@ public class RemotePlayerManager : MonoBehaviour
     {
         if (remotePlayers.TryGetValue(playerInfo.id, out RemotePlayer remotePlayer))
         {
+            ApplyShipVisual(remotePlayer, playerInfo.shipId);
             return remotePlayer;
         }
 
@@ -114,6 +115,7 @@ public class RemotePlayerManager : MonoBehaviour
 
         remotePlayer.playerId = playerInfo.id;
         remotePlayer.playerName = playerInfo.name;
+        ApplyShipVisual(remotePlayer, playerInfo.shipId);
         remotePlayers.Add(playerInfo.id, remotePlayer);
 
         return remotePlayer;
@@ -123,37 +125,36 @@ public class RemotePlayerManager : MonoBehaviour
     {
         Vector3 position = new Vector3(playerInfo.x, playerInfo.y, playerInfo.z);
         Quaternion rotation = Quaternion.Euler(0f, playerInfo.yaw, 0f);
-        GameObject ship;
-
-        if (remoteShipPrefab != null)
-        {
-            ship = new GameObject("Remote Ship - " + playerInfo.id);
-            ship.transform.SetParent(remotePlayersParent);
-            ship.transform.SetPositionAndRotation(position, rotation);
-
-            GameObject model = Instantiate(remoteShipPrefab, ship.transform);
-            model.name = "ShipModel";
-            model.transform.localPosition = remoteModelLocalPosition;
-            model.transform.localRotation = Quaternion.Euler(remoteModelLocalEulerAngles);
-            model.transform.localScale = remoteModelLocalScale;
-        }
-        else
-        {
-            ship = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            ship.transform.SetParent(remotePlayersParent);
-            ship.transform.SetPositionAndRotation(position, rotation);
-            ship.transform.localScale = new Vector3(1f, 0.5f, 2f);
-
-            Renderer renderer = ship.GetComponent<Renderer>();
-
-            if (renderer != null)
-            {
-                renderer.material.color = Color.cyan;
-            }
-        }
+        GameObject ship = new GameObject("Remote Ship - " + playerInfo.id);
+        ship.transform.SetParent(remotePlayersParent);
+        ship.transform.SetPositionAndRotation(position, rotation);
 
         ship.name = "Remote Ship - " + playerInfo.id;
         return ship;
+    }
+
+    private void ApplyShipVisual(RemotePlayer remotePlayer, string shipId)
+    {
+        if (remotePlayer == null)
+        {
+            return;
+        }
+
+        GameObject shipPrefab = ShipLibrary.GetShipPrefab(shipId);
+
+        if (shipPrefab != null)
+        {
+            remotePlayer.SetShipVisual(shipId, shipPrefab, remoteModelLocalPosition, remoteModelLocalEulerAngles, remoteModelLocalScale);
+            return;
+        }
+
+        if (remoteShipPrefab != null)
+        {
+            remotePlayer.SetShipVisual("default", remoteShipPrefab, remoteModelLocalPosition, remoteModelLocalEulerAngles, remoteModelLocalScale);
+            return;
+        }
+
+        remotePlayer.EnsureFallbackVisual();
     }
 
     private void HandleShootEvent(ShootEventMessage shootEvent)
